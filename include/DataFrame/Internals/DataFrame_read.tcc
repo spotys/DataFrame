@@ -45,7 +45,7 @@ namespace hmdf
 // ----------------------------------------------------------------------------
 
 template<typename I, typename  H>
-void DataFrame<I, H>::read_json_(std::ifstream &file, bool columns_only)  {
+void DataFrame<I, H>::read_json_(std::istream &file, bool columns_only)  {
 
     char    c { '\0' };
     char    col_name[256];
@@ -279,7 +279,7 @@ void DataFrame<I, H>::read_json_(std::ifstream &file, bool columns_only)  {
 // ----------------------------------------------------------------------------
 
 template<typename I, typename  H>
-void DataFrame<I, H>::read_csv_(std::ifstream &file, bool columns_only)  {
+void DataFrame<I, H>::read_csv_(std::istream &file, bool columns_only)  {
 
     char    col_name[256];
     char    value[32];
@@ -431,7 +431,7 @@ struct _col_data_spec_  {
 // --------------------------------------
 
 template<typename I, typename  H>
-void DataFrame<I, H>::read_csv2_(std::ifstream &file, bool columns_only)  {
+void DataFrame<I, H>::read_csv2_(std::istream &file, bool columns_only)  {
 
     char                            value[8192];
     char                            c;
