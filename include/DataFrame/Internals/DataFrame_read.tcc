@@ -523,6 +523,16 @@ void DataFrame<I, H>::read_csv2_(std::istream &file, bool columns_only)  {
                                       type_str,
                                       col_name,
                                       ::atoi(value));
+            else if (! ::strcmp(type_str, "DateTimeAme"))
+                spec_vec.emplace_back(std::vector<DateTime>(),
+                                      type_str,
+                                      col_name,
+                                      ::atoi(value));
+            else if (! ::strcmp(type_str, "DateTimeEur"))
+                spec_vec.emplace_back(std::vector<DateTime>(),
+                                      type_str,
+                                      col_name,
+                                      ::atoi(value));
             else if (! ::strcmp(type_str, "bool"))
                 spec_vec.emplace_back(std::vector<bool>(),
                                       type_str,
@@ -612,6 +622,14 @@ void DataFrame<I, H>::read_csv2_(std::istream &file, bool columns_only)  {
                         (col_spec.col_vec).emplace_back(
                             std::move(dt));
                 }
+            }
+            else if (col_spec.type_spec == "DateTimeAme")  {
+                std::any_cast<std::vector<DateTime> &>
+                    (col_spec.col_vec).emplace_back(DateTime(value, DT_DATE_STYLE::AME_STYLE));
+            }
+            else if (col_spec.type_spec == "DateTimeEur")  {
+                std::any_cast<std::vector<DateTime> &>
+                    (col_spec.col_vec).emplace_back(DateTime(value, DT_DATE_STYLE::EUR_STYLE));
             }
             else if (col_spec.type_spec == "bool")  {
                 if (value[0] != '\0')  {
