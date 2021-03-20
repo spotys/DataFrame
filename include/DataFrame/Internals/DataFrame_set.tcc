@@ -191,7 +191,7 @@ DataFrame<I, H>::load_data (IndexVecType &&indices, Ts&& ... args)  {
             cnt += this->_load_pair(pa);
         };
 
-    for_each_in_tuple_ (args_tuple, fc);
+    for_each_in_tuple (args_tuple, fc);
 
     return (cnt);
 }
@@ -375,7 +375,7 @@ load_column (const char *name,
     s = vec_ptr->size();
     if (padding == nan_policy::pad_with_nans && s < idx_s)  {
         for (size_type i = 0; i < idx_s - s; ++i)  {
-            vec_ptr->push_back (std::move(_get_nan<T>()));
+            vec_ptr->push_back (std::move(get_nan<T>()));
             ret_cnt += 1;
         }
     }
@@ -433,7 +433,7 @@ load_column (const char *name, std::vector<T> &&data, nan_policy padding)  {
 
     if (padding == nan_policy::pad_with_nans && data_s < idx_s)  {
         for (size_type i = 0; i < idx_s - data_s; ++i)  {
-            data.push_back (std::move(_get_nan<T>()));
+            data.push_back (std::move(get_nan<T>()));
             ret_cnt += 1;
         }
     }
@@ -571,7 +571,7 @@ append_column (const char *name,
     s = vec.size();
     if (padding == nan_policy::pad_with_nans && s < idx_s)  {
         for (size_type i = 0; i < idx_s - s; ++i)  {
-            vec.push_back (std::move(_get_nan<T>()));
+            vec.push_back (std::move(get_nan<T>()));
             ret_cnt += 1;
         }
     }
@@ -612,7 +612,7 @@ append_column (const char *name, const T &val, nan_policy padding)  {
     s = vec.size();
     if (padding == nan_policy::pad_with_nans && s < idx_s)  {
         for (size_type i = 0; i < idx_s - s; ++i)  {
-            vec.push_back (std::move(_get_nan<T>()));
+            vec.push_back (std::move(get_nan<T>()));
             ret_cnt += 1;
         }
     }
@@ -741,8 +741,8 @@ remove_data_by_sel (const char *name1, const char *name2, F &sel_functor)  {
     col_indices.reserve(indices_.size() / 2);
     for (size_type i = 0; i < col_s; ++i)
         if (sel_functor (indices_[i],
-                         i < col_s1 ? vec1[i] : _get_nan<T1>(),
-                         i < col_s2 ? vec2[i] : _get_nan<T2>()))
+                         i < col_s1 ? vec1[i] : get_nan<T1>(),
+                         i < col_s2 ? vec2[i] : get_nan<T2>()))
             col_indices.push_back(i);
 
     for (auto col_citer : column_list_)  {
@@ -782,9 +782,9 @@ remove_data_by_sel (const char *name1,
     col_indices.reserve(indices_.size() / 2);
     for (size_type i = 0; i < col_s; ++i)
         if (sel_functor (indices_[i],
-                         i < col_s1 ? vec1[i] : _get_nan<T1>(),
-                         i < col_s2 ? vec2[i] : _get_nan<T2>(),
-                         i < col_s3 ? vec3[i] : _get_nan<T3>()))
+                         i < col_s1 ? vec1[i] : get_nan<T1>(),
+                         i < col_s2 ? vec2[i] : get_nan<T2>(),
+                         i < col_s3 ? vec3[i] : get_nan<T3>()))
             col_indices.push_back(i);
 
     for (auto col_citer : column_list_)  {
@@ -1180,6 +1180,87 @@ consolidate(const char *old_col_name1,
         remove_column(old_col_name1);
         remove_column(old_col_name2);
         remove_column(old_col_name3);
+    }
+    return;
+}
+
+// ----------------------------------------------------------------------------
+
+template<typename I, typename  H>
+template<typename OLD_T1, typename OLD_T2, typename OLD_T3, typename OLD_T4,
+         typename NEW_T, typename F>
+void DataFrame<I, H>::
+consolidate(const char *old_col_name1,
+            const char *old_col_name2,
+            const char *old_col_name3,
+            const char *old_col_name4,
+            const char *new_col_name,
+            F &functor,
+            bool delete_old_cols)  {
+
+    static_assert(std::is_base_of<HeteroVector, H>::value,
+                  "Only a StdDataFrame can call consolidate()");
+
+    const ColumnVecType<OLD_T1> &vec1 = get_column<OLD_T1>(old_col_name1);
+    const ColumnVecType<OLD_T2> &vec2 = get_column<OLD_T2>(old_col_name2);
+    const ColumnVecType<OLD_T3> &vec3 = get_column<OLD_T3>(old_col_name3);
+    const ColumnVecType<OLD_T4> &vec4 = get_column<OLD_T4>(old_col_name4);
+
+    load_column<NEW_T>(new_col_name,
+                       std::move(functor(indices_.begin(), indices_.end(),
+                                         vec1.begin(), vec1.end(),
+                                         vec2.begin(), vec2.end(),
+                                         vec3.begin(), vec3.end(),
+                                         vec4.begin(), vec4.end())),
+                       nan_policy::dont_pad_with_nans);
+    if (delete_old_cols)  {
+        remove_column(old_col_name1);
+        remove_column(old_col_name2);
+        remove_column(old_col_name3);
+        remove_column(old_col_name4);
+    }
+    return;
+}
+
+// ----------------------------------------------------------------------------
+
+template<typename I, typename  H>
+template<typename OLD_T1, typename OLD_T2, typename OLD_T3,
+         typename OLD_T4, typename OLD_T5,
+         typename NEW_T, typename F>
+void DataFrame<I, H>::
+consolidate(const char *old_col_name1,
+            const char *old_col_name2,
+            const char *old_col_name3,
+            const char *old_col_name4,
+            const char *old_col_name5,
+            const char *new_col_name,
+            F &functor,
+            bool delete_old_cols)  {
+
+    static_assert(std::is_base_of<HeteroVector, H>::value,
+                  "Only a StdDataFrame can call consolidate()");
+
+    const ColumnVecType<OLD_T1> &vec1 = get_column<OLD_T1>(old_col_name1);
+    const ColumnVecType<OLD_T2> &vec2 = get_column<OLD_T2>(old_col_name2);
+    const ColumnVecType<OLD_T3> &vec3 = get_column<OLD_T3>(old_col_name3);
+    const ColumnVecType<OLD_T4> &vec4 = get_column<OLD_T4>(old_col_name4);
+    const ColumnVecType<OLD_T5> &vec5 = get_column<OLD_T5>(old_col_name5);
+
+    load_column<NEW_T>(new_col_name,
+                       std::move(functor(indices_.begin(), indices_.end(),
+                                         vec1.begin(), vec1.end(),
+                                         vec2.begin(), vec2.end(),
+                                         vec3.begin(), vec3.end(),
+                                         vec4.begin(), vec4.end(),
+                                         vec5.begin(), vec5.end())),
+                       nan_policy::dont_pad_with_nans);
+    if (delete_old_cols)  {
+        remove_column(old_col_name1);
+        remove_column(old_col_name2);
+        remove_column(old_col_name3);
+        remove_column(old_col_name4);
+        remove_column(old_col_name5);
     }
     return;
 }

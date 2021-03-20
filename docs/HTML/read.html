@@ -36,11 +36,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
         <PRE><B>
 bool
 read(const char *file_name,
-     io_format iof = io_format::csv);
+     io_format iof = io_format::csv,
+     bool columns_only = false);
         </B></PRE></font>
       </td>
       <td>
-        It inputs the contents of a text file into itself (i.e. DataFrame). Currently two formats (i.e. csv, json) are supported specified by the iof parameter.<BR>
+        It inputs the contents of a text file/stream into itself (i.e. DataFrame). Currently 3 formats (i.e. csv, csv2, json) are supported. See io_format documentation page<BR>
         The <B>CSV</B> file format must be:<BR>
         <PRE>
   INDEX:&lt;Number of data points&gt;:&lt;Comma delimited list of values&gt;
@@ -50,9 +51,9 @@ read(const char *file_name,
       .
       .
         </PRE>
-        All empty lines or lines starting with # will be skipped.<BR><BR>
+        All empty lines or lines starting with # will be skipped. For examples see files in test directory<BR><BR>
 
-        The <B>CSV2</B> file format must be (this like regular Pandas-like format):<BR>
+        The <B>CSV2</B> file format must be (this is similar to Pandas csv format):<BR>
         <PRE>
   INDEX:&lt;Number of data points&gt;:&lt;Index type&gt;:,&lt;Column1 name&gt;:&lt;Number of data points&gt;:&lt;Column1 type&gt;,&lt;Column2 name&gt;:&lt;Number of data points&gt;:&lt;Column2 type&gt;, . . .
   Comma delimited rows of values
@@ -60,28 +61,34 @@ read(const char *file_name,
       .
       .
         </PRE>
-        All empty lines or lines starting with # will be skipped.<BR><BR>
+        All empty lines or lines starting with # will be skipped. For examples see IBM and FORD files in test directory<BR><BR>
 
         The <B>JSON</B> file format looks like this:<BR>
         <PRE>
-          {
-            "INDEX":{"N":3,"T":"ulong","D":[123450,123451,123452]},
-            "col_3":{"N":3,"T":"double","D":[15.2,16.34,17.764]},
-            "col_4":{"N":3,"T":"int","D":[22,23,24]},
-            "col_str":{"N":3,"T":"string","D":["11","22","33"]},
-            "col_2":{"N":3,"T":"double","D":[8,9.001,10]},
-            "col_1":{"N":3,"T":"double","D":[1,2,3.456]}
-          }
+  {
+    "INDEX":{"N":3,"T":"ulong","D":[123450,123451,123452]},
+    "col_3":{"N":3,"T":"double","D":[15.2,16.34,17.764]},
+    "col_4":{"N":3,"T":"int","D":[22,23,24]},
+    "col_str":{"N":3,"T":"string","D":["11","22","33"]},
+    "col_2":{"N":3,"T":"double","D":[8,9.001,10]},
+    "col_1":{"N":3,"T":"double","D":[1,2,3.456]}
+  }
         </PRE>
         Please note DataFrame json does not follow json spec 100%. In json, there is no particular order in dictionary fields. But in DataFrame json:<BR>
         <OL>
-          <LI>Column “INDEX” must be the first column</LI>
-          <LI>Fields in column dictionaries must be in N, T, D order</LI>
+          <LI>Column “INDEX” must be the first column, if it exists</LI>
+          <LI>Fields in column dictionaries must be in N (name), T (type), D (data) order</LI>
         </OL>
       </td>
       <td>
-        <B>file_name</B>: Complete path to the file<BR>
-        <B>iof</B>: Specifies the I/O format. The default is CSV
+        <PRE>
+<B>file_name</B>: Complete path to the file
+<B>iof</B>: Specifies the I/O format. The default is CSV
+<B>columns_only</B>: If true, the index column is not read.
+              You may want to do that to read multiple files into the same DataFrame.
+              If <I>columns_only</I> is false the index column must exist in the stream.
+              If <I>columns_only</I> is true the index column may or may not exist
+        </PRE>
       </td>
     </tr>
 
@@ -91,15 +98,14 @@ read(const char *file_name,
 template&lt;typename S&gt;
 bool
 read(S &amp;in_s,
-     io_format iof = io_format::csv);
+     io_format iof = io_format::csv,
+     bool columns_only = false);
         </B></PRE></font>
       </td>
       <td>
         Same as read() above, but takes a reference to a stream
       </td>
       <td>
-        <B>file_name</B>: Complete path to the file<BR>
-        <B>iof</B>: Specifies the I/O format. The default is CSV
       </td>
     </tr>
 
@@ -108,15 +114,14 @@ read(S &amp;in_s,
         <PRE><B>
 std::future&lt;bool&gt;
 read_async(const char *file_name,
-           io_format iof = io_format::csv);
+           io_format iof = io_format::csv,
+           bool columns_only = false);
         </B></PRE></font>
       </td>
       <td>
         Same as read() above, but executed asynchronously
       </td>
       <td>
-        <B>file_name</B>: Complete path to the file<BR>
-        <B>iof</B>: Specifies the I/O format. The default is CSV
       </td>
     </tr>
 
@@ -126,15 +131,14 @@ read_async(const char *file_name,
 template&lt;typename S&gt;
 std::future&lt;bool&gt;
 read_async(S &amp;in_s,
-           io_format iof = io_format::csv);
+           io_format iof = io_format::csv,
+           bool columns_only = false);
         </B></PRE></font>
       </td>
       <td>
         Same as read_async() above, but takes a reference to a stream
       </td>
       <td>
-        <B>file_name</B>: Complete path to the file<BR>
-        <B>iof</B>: Specifies the I/O format. The default is CSV
       </td>
     </tr>
 

@@ -182,9 +182,9 @@ get_col_unique_values(const char *name) const  {
 
     result.reserve(vec.size());
     for (auto citer : vec)  {
-        if (_is_nan<T>(citer) && ! counted_nan)  {
+        if (is_nan<T>(citer) && ! counted_nan)  {
             counted_nan = true;
-            result.push_back(_get_nan<T>());
+            result.push_back(get_nan<T>());
             continue;
         }
 
@@ -195,547 +195,6 @@ get_col_unique_values(const char *name) const  {
     }
 
     return(result);
-}
-
-// ----------------------------------------------------------------------------
-
-template<typename I, typename  H>
-template<typename ... Ts>
-void DataFrame<I, H>::multi_visit (Ts ... args)  {
-
-    auto    args_tuple = std::tuple<Ts ...>(args ...);
-    auto    fc = [this](auto &pa) mutable -> void {
-        auto &functor = *(pa.second);
-
-        using T =
-            typename std::remove_reference<decltype(functor)>::type::value_type;
-        using V =
-            typename std::remove_const<
-                typename std::remove_reference<decltype(functor)>::type>::type;
-
-        this->visit<T, V>(pa.first, functor);
-    };
-
-    for_each_in_tuple_ (args_tuple, fc);
-    return;
-}
-
-// ----------------------------------------------------------------------------
-
-template<typename I, typename  H>
-template<typename T, typename V>
-V &DataFrame<I, H>::visit (const char *name, V &visitor)  {
-
-    auto            &vec = get_column<T>(name);
-    const size_type idx_s = indices_.size();
-    const size_type min_s = std::min<size_type>(vec.size(), idx_s);
-    size_type       i = 0;
-
-    visitor.pre();
-    for (; i < min_s; ++i)
-        visitor (indices_[i], vec[i]);
-    for (; i < idx_s; ++i)  {
-        T   nan_val = _get_nan<T>();
-
-        visitor (indices_[i], nan_val);
-    }
-    visitor.post();
-
-    return (visitor);
-}
-
-// ----------------------------------------------------------------------------
-
-template<typename I, typename  H>
-template<typename T, typename V>
-std::future<V &> DataFrame<I, H>::visit_async(const char *name, V &visitor)  {
-
-    return (std::async(
-        std::launch::async,
-        static_cast<V &(DataFrame::*)(const char *, V &)>
-           (&DataFrame::visit<T, V>),
-        this,
-        name,
-        std::ref(visitor)));
-}
-
-// ----------------------------------------------------------------------------
-
-template<typename I, typename  H>
-template<typename T, typename V>
-std::future<V &> DataFrame<I, H>::
-visit_async(const char *name, V &visitor) const  {
-
-    return (std::async(
-        std::launch::async,
-        static_cast<V &(DataFrame::*)(const char *, V &) const>
-           (&DataFrame::visit<T, V>),
-        this,
-        name,
-        std::ref(visitor)));
-}
-
-// ----------------------------------------------------------------------------
-
-template<typename I, typename  H>
-template<typename T1, typename T2, typename V>
-V &DataFrame<I, H>::
-visit (const char *name1, const char *name2, V &visitor)  {
-
-    auto            &vec1 = get_column<T1>(name1);
-    auto            &vec2 = get_column<T2>(name2);
-    const size_type idx_s = indices_.size();
-    const size_type data_s1 = vec1.size();
-    const size_type data_s2 = vec2.size();
-    const size_type min_s = std::min<size_type>({ idx_s, data_s1, data_s2 });
-    size_type       i = 0;
-
-    visitor.pre();
-    for (; i < min_s; ++i)
-        visitor (indices_[i], vec1[i], vec2[i]);
-    for (; i < idx_s; ++i)  {
-        T1  nan_val1 = _get_nan<T1>();
-        T2  nan_val2 = _get_nan<T2>();
-
-        visitor (indices_[i],
-                 i < data_s1 ? vec1[i] : nan_val1,
-                 i < data_s2 ? vec2[i] : nan_val2);
-    }
-    visitor.post();
-
-    return (visitor);
-}
-
-// ----------------------------------------------------------------------------
-
-template<typename I, typename  H>
-template<typename T1, typename T2, typename V>
-std::future<V &> DataFrame<I, H>::
-visit_async(const char *name1, const char *name2, V &visitor)  {
-
-    return (std::async(
-        std::launch::async,
-        static_cast<V &(DataFrame::*)(const char *, const char *, V &)>
-            (&DataFrame::visit<T1, T2, V>),
-        this,
-        name1,
-        name2,
-        std::ref(visitor)));
-}
-
-// ----------------------------------------------------------------------------
-
-template<typename I, typename  H>
-template<typename T1, typename T2, typename V>
-std::future<V &> DataFrame<I, H>::
-visit_async(const char *name1, const char *name2, V &visitor) const  {
-
-    return (std::async(
-        std::launch::async,
-        static_cast<V &(DataFrame::*)(const char *, const char *, V &) const>
-            (&DataFrame::visit<T1, T2, V>),
-        this,
-        name1,
-        name2,
-        std::ref(visitor)));
-}
-
-// ----------------------------------------------------------------------------
-
-template<typename I, typename  H>
-template<typename T1, typename T2, typename T3, typename V>
-V &DataFrame<I, H>::
-visit (const char *name1, const char *name2, const char *name3, V &visitor)  {
-
-    auto            &vec1 = get_column<T1>(name1);
-    auto            &vec2 = get_column<T2>(name2);
-    auto            &vec3 = get_column<T3>(name3);
-    const size_type idx_s = indices_.size();
-    const size_type data_s1 = vec1.size();
-    const size_type data_s2 = vec2.size();
-    const size_type data_s3 = vec3.size();
-    const size_type min_s =
-        std::min<size_type>({ idx_s, data_s1, data_s2, data_s3 });
-    size_type       i = 0;
-
-    visitor.pre();
-    for (; i < min_s; ++i)
-        visitor (indices_[i], vec1[i], vec2[i], vec3[i]);
-    for (; i < idx_s; ++i)  {
-        T1  nan_val1 = _get_nan<T1>();
-        T2  nan_val2 = _get_nan<T2>();
-        T3  nan_val3 = _get_nan<T3>();
-
-        visitor (indices_[i],
-                 i < data_s1 ? vec1[i] : nan_val1,
-                 i < data_s2 ? vec2[i] : nan_val2,
-                 i < data_s3 ? vec3[i] : nan_val3);
-    }
-    visitor.post();
-
-    return (visitor);
-}
-
-// ----------------------------------------------------------------------------
-
-template<typename I, typename  H>
-template<typename T1, typename T2, typename T3, typename V>
-std::future<V &> DataFrame<I, H>::
-visit_async(const char *name1,
-            const char *name2,
-            const char *name3,
-            V &visitor)  {
-
-    return (std::async(
-        std::launch::async,
-        static_cast<V &(DataFrame::*)(const char *,
-                                      const char *,
-                                      const char *,
-                                      V &)>
-            (&DataFrame::visit<T1, T2, T3, V>),
-        this,
-        name1,
-        name2,
-        name3,
-        std::ref(visitor)));
-}
-
-// ----------------------------------------------------------------------------
-
-template<typename I, typename  H>
-template<typename T1, typename T2, typename T3, typename V>
-std::future<V &> DataFrame<I, H>::
-visit_async(const char *name1,
-            const char *name2,
-            const char *name3,
-            V &visitor) const {
-
-    return (std::async(
-        std::launch::async,
-        static_cast<V &(DataFrame::*)(const char *,
-                                      const char *,
-                                      const char *,
-                                      V &) const>
-            (&DataFrame::visit<T1, T2, T3, V>),
-        this,
-        name1,
-        name2,
-        name3,
-        std::ref(visitor)));
-}
-
-// ----------------------------------------------------------------------------
-
-template<typename I, typename  H>
-template<typename T1, typename T2, typename T3, typename T4, typename V>
-V &DataFrame<I, H>::
-visit (const char *name1,
-       const char *name2,
-       const char *name3,
-       const char *name4,
-       V &visitor)  {
-
-    auto            &vec1 = get_column<T1>(name1);
-    auto            &vec2 = get_column<T2>(name2);
-    auto            &vec3 = get_column<T3>(name3);
-    auto            &vec4 = get_column<T4>(name4);
-    const size_type idx_s = indices_.size();
-    const size_type data_s1 = vec1.size();
-    const size_type data_s2 = vec2.size();
-    const size_type data_s3 = vec3.size();
-    const size_type data_s4 = vec4.size();
-    const size_type min_s =
-        std::min<size_type>({ idx_s, data_s1, data_s2, data_s3, data_s4 });
-    size_type       i = 0;
-
-    visitor.pre();
-    for (; i < min_s; ++i)
-        visitor (indices_[i], vec1[i], vec2[i], vec3[i], vec4[i]);
-    for (; i < idx_s; ++i)  {
-        T1  nan_val1 = _get_nan<T1>();
-        T2  nan_val2 = _get_nan<T2>();
-        T3  nan_val3 = _get_nan<T3>();
-        T4  nan_val4 = _get_nan<T4>();
-
-        visitor (indices_[i],
-                 i < data_s1 ? vec1[i] : nan_val1,
-                 i < data_s2 ? vec2[i] : nan_val2,
-                 i < data_s3 ? vec3[i] : nan_val3,
-                 i < data_s4 ? vec4[i] : nan_val4);
-    }
-    visitor.post();
-
-    return (visitor);
-}
-
-// ----------------------------------------------------------------------------
-
-template<typename I, typename  H>
-template<typename T1, typename T2, typename T3, typename T4, typename V>
-std::future<V &> DataFrame<I, H>::
-visit_async(const char *name1,
-            const char *name2,
-            const char *name3,
-            const char *name4,
-            V &visitor)  {
-
-    return (std::async(
-        std::launch::async,
-        static_cast<V &(DataFrame::*)(const char *,
-                                      const char *,
-                                      const char *,
-                                      const char *,
-                                      V &)>
-            (&DataFrame::visit<T1, T2, T3, T4, V>),
-        this,
-        name1,
-        name2,
-        name3,
-        name4,
-        std::ref(visitor)));
-}
-
-// ----------------------------------------------------------------------------
-
-template<typename I, typename  H>
-template<typename T1, typename T2, typename T3, typename T4, typename V>
-std::future<V &> DataFrame<I, H>::
-visit_async(const char *name1,
-            const char *name2,
-            const char *name3,
-            const char *name4,
-            V &visitor) const {
-
-    return (std::async(
-        std::launch::async,
-        static_cast<V &(DataFrame::*)(const char *,
-                                      const char *,
-                                      const char *,
-                                      const char *,
-                                      V &) const>
-            (&DataFrame::visit<T1, T2, T3, T4, V>),
-        this,
-        name1,
-        name2,
-        name3,
-        name4,
-        std::ref(visitor)));
-}
-
-// ----------------------------------------------------------------------------
-
-template<typename I, typename  H>
-template<typename T1, typename T2, typename T3, typename T4, typename T5,
-         typename V>
-V &DataFrame<I, H>::
-visit (const char *name1,
-       const char *name2,
-       const char *name3,
-       const char *name4,
-       const char *name5,
-       V &visitor)  {
-
-    auto            &vec1 = get_column<T1>(name1);
-    auto            &vec2 = get_column<T2>(name2);
-    auto            &vec3 = get_column<T3>(name3);
-    auto            &vec4 = get_column<T4>(name4);
-    auto            &vec5 = get_column<T5>(name5);
-    const size_type idx_s = indices_.size();
-    const size_type data_s1 = vec1.size();
-    const size_type data_s2 = vec2.size();
-    const size_type data_s3 = vec3.size();
-    const size_type data_s4 = vec4.size();
-    const size_type data_s5 = vec5.size();
-    const size_type min_s =
-        std::min<size_type>(
-            { idx_s, data_s1, data_s2, data_s3, data_s4, data_s5 });
-    size_type       i = 0;
-
-    visitor.pre();
-    for (; i < min_s; ++i)
-        visitor (indices_[i], vec1[i], vec2[i], vec3[i], vec4[i], vec5[i]);
-    for (; i < idx_s; ++i)  {
-        T1  nan_val1 = _get_nan<T1>();
-        T2  nan_val2 = _get_nan<T2>();
-        T3  nan_val3 = _get_nan<T3>();
-        T4  nan_val4 = _get_nan<T4>();
-        T5  nan_val5 = _get_nan<T5>();
-
-        visitor (indices_[i],
-                 i < data_s1 ? vec1[i] : nan_val1,
-                 i < data_s2 ? vec2[i] : nan_val2,
-                 i < data_s3 ? vec3[i] : nan_val3,
-                 i < data_s4 ? vec4[i] : nan_val4,
-                 i < data_s5 ? vec5[i] : nan_val5);
-    }
-    visitor.post();
-
-    return (visitor);
-}
-
-// ----------------------------------------------------------------------------
-
-template<typename I, typename  H>
-template<typename T1, typename T2, typename T3, typename T4, typename T5,
-         typename V>
-std::future<V &> DataFrame<I, H>::
-visit_async(const char *name1,
-            const char *name2,
-            const char *name3,
-            const char *name4,
-            const char *name5,
-            V &visitor)  {
-
-    return (std::async(
-        std::launch::async,
-        static_cast<V &(DataFrame::*)(const char *,
-                                      const char *,
-                                      const char *,
-                                      const char *,
-                                      const char *,
-                                      V &)>
-            (&DataFrame::visit<T1, T2, T3, T4, T5, V>),
-        this,
-        name1,
-        name2,
-        name3,
-        name4,
-        name5,
-        std::ref(visitor)));
-}
-
-// ----------------------------------------------------------------------------
-
-template<typename I, typename  H>
-template<typename T1, typename T2, typename T3, typename T4, typename T5,
-         typename V>
-std::future<V &> DataFrame<I, H>::
-visit_async(const char *name1,
-            const char *name2,
-            const char *name3,
-            const char *name4,
-            const char *name5,
-            V &visitor) const {
-
-    return (std::async(
-        std::launch::async,
-        static_cast<V &(DataFrame::*)(const char *,
-                                      const char *,
-                                      const char *,
-                                      const char *,
-                                      const char *,
-                                      V &) const>
-            (&DataFrame::visit<T1, T2, T3, T4, T5, V>),
-        this,
-        name1,
-        name2,
-        name3,
-        name4,
-        name5,
-        std::ref(visitor)));
-}
-
-// ----------------------------------------------------------------------------
-
-template<typename I, typename  H>
-template<typename T, typename V>
-V &DataFrame<I, H>::
-single_act_visit (const char *name, V &visitor)  {
-
-    auto    &vec = get_column<T>(name);
-
-    visitor.pre();
-    visitor (indices_.begin(), indices_.end(), vec.begin(), vec.end());
-    visitor.post();
-
-    return (visitor);
-}
-
-// ----------------------------------------------------------------------------
-
-template<typename I, typename  H>
-template<typename T, typename V>
-std::future<V &> DataFrame<I, H>::
-single_act_visit_async(const char *name, V &visitor)  {
-
-    return (std::async(
-        std::launch::async,
-        static_cast<V &(DataFrame::*)(const char *, V &)>
-           (&DataFrame::single_act_visit<T, V>),
-        this,
-        name,
-        std::ref(visitor)));
-}
-
-// ----------------------------------------------------------------------------
-
-template<typename I, typename  H>
-template<typename T, typename V>
-std::future<V &> DataFrame<I, H>::
-single_act_visit_async(const char *name, V &visitor) const  {
-
-    return (std::async(
-        std::launch::async,
-        static_cast<V &(DataFrame::*)(const char *, V &) const>
-           (&DataFrame::single_act_visit<T, V>),
-        this,
-        name,
-        std::ref(visitor)));
-}
-
-// ----------------------------------------------------------------------------
-
-template<typename I, typename  H>
-template<typename T1, typename T2, typename V>
-V &DataFrame<I, H>::
-single_act_visit (const char *name1, const char *name2, V &visitor)  {
-
-    const ColumnVecType<T1> &vec1 = get_column<T1>(name1);
-    const ColumnVecType<T2> &vec2 = get_column<T2>(name2);
-
-    visitor.pre();
-    visitor (indices_.begin(), indices_.end(),
-             vec1.begin(), vec1.end(),
-             vec2.begin(), vec2.end());
-    visitor.post();
-
-    return (visitor);
-}
-
-// ----------------------------------------------------------------------------
-
-template<typename I, typename  H>
-template<typename T1, typename T2, typename V>
-std::future<V &> DataFrame<I, H>::
-single_act_visit_async(const char *name1, const char *name2, V &visitor)  {
-
-    return (std::async(
-        std::launch::async,
-        static_cast<V &(DataFrame::*)(const char *, const char *, V &)>
-            (&DataFrame::single_act_visit<T1, T2, V>),
-        this,
-        name1,
-        name2,
-        std::ref(visitor)));
-}
-
-// ----------------------------------------------------------------------------
-
-template<typename I, typename  H>
-template<typename T1, typename T2, typename V>
-std::future<V &> DataFrame<I, H>::
-single_act_visit_async(const char *name1,
-                       const char *name2,
-                       V &visitor) const  {
-
-    return (std::async(
-        std::launch::async,
-        static_cast<V &(DataFrame::*)(const char *, const char *, V &) const>
-            (&DataFrame::single_act_visit<T1, T2, V>),
-        this,
-        name1,
-        name2,
-        std::ref(visitor)));
 }
 
 // ----------------------------------------------------------------------------
@@ -1168,8 +627,8 @@ get_data_by_sel (const char *name1, const char *name2, F &sel_functor) const  {
     col_indices.reserve(idx_s / 2);
     for (size_type i = 0; i < col_s; ++i)
         if (sel_functor (indices_[i],
-                         i < col_s1 ? vec1[i] : _get_nan<T1>(),
-                         i < col_s2 ? vec2[i] : _get_nan<T2>()))
+                         i < col_s1 ? vec1[i] : get_nan<T1>(),
+                         i < col_s2 ? vec2[i] : get_nan<T2>()))
             col_indices.push_back(i);
 
     DataFrame       df;
@@ -1214,8 +673,8 @@ get_view_by_sel (const char *name1, const char *name2, F &sel_functor) const  {
     col_indices.reserve(idx_s / 2);
     for (size_type i = 0; i < col_s; ++i)
         if (sel_functor (indices_[i],
-                         i < col_s1 ? vec1[i] : _get_nan<T1>(),
-                         i < col_s2 ? vec2[i] : _get_nan<T2>()))
+                         i < col_s1 ? vec1[i] : get_nan<T1>(),
+                         i < col_s2 ? vec2[i] : get_nan<T2>()))
             col_indices.push_back(i);
 
     using TheView = DataFramePtrView<IndexType>;
@@ -1266,9 +725,9 @@ get_data_by_sel (const char *name1,
     col_indices.reserve(idx_s / 2);
     for (size_type i = 0; i < col_s; ++i)
         if (sel_functor (indices_[i],
-                         i < col_s1 ? vec1[i] : _get_nan<T1>(),
-                         i < col_s2 ? vec2[i] : _get_nan<T2>(),
-                         i < col_s3 ? vec3[i] : _get_nan<T3>()))
+                         i < col_s1 ? vec1[i] : get_nan<T1>(),
+                         i < col_s2 ? vec2[i] : get_nan<T2>(),
+                         i < col_s3 ? vec3[i] : get_nan<T3>()))
             col_indices.push_back(i);
 
     DataFrame       df;
@@ -1318,9 +777,9 @@ get_view_by_sel (const char *name1,
     col_indices.reserve(idx_s / 2);
     for (size_type i = 0; i < col_s; ++i)
         if (sel_functor (indices_[i],
-                         i < col_s1 ? vec1[i] : _get_nan<T1>(),
-                         i < col_s2 ? vec2[i] : _get_nan<T2>(),
-                         i < col_s3 ? vec3[i] : _get_nan<T3>()))
+                         i < col_s1 ? vec1[i] : get_nan<T1>(),
+                         i < col_s2 ? vec2[i] : get_nan<T2>(),
+                         i < col_s3 ? vec3[i] : get_nan<T3>()))
             col_indices.push_back(i);
 
     using TheView = DataFramePtrView<IndexType>;
@@ -1602,178 +1061,6 @@ DataFrame<I, H>::get_columns_info () const  {
 // ----------------------------------------------------------------------------
 
 template<typename I, typename  H>
-template<typename V>
-bool DataFrame<I, H>::is_monotonic_increasing_(const V &column)  {
-
-    const size_type col_s = column.size();
-
-    for (size_type i = 1; i < col_s; ++i)
-        if (column[i] < column[i - 1])
-            return(false);
-    return(true);
-}
-
-// ----------------------------------------------------------------------------
-
-template<typename I, typename  H>
-template<typename V>
-bool DataFrame<I, H>::is_strictly_monotonic_increasing_(const V &column)  {
-
-    const size_type col_s = column.size();
-
-    for (size_type i = 1; i < col_s; ++i)
-        if (column[i] <= column[i - 1])
-            return(false);
-    return(true);
-}
-
-// ----------------------------------------------------------------------------
-
-template<typename I, typename  H>
-template<typename V>
-bool DataFrame<I, H>::is_monotonic_decreasing_(const V &column)  {
-
-    const size_type col_s = column.size();
-
-    for (size_type i = 1; i < col_s; ++i)
-        if (column[i] > column[i - 1])
-            return(false);
-    return(true);
-}
-
-// ----------------------------------------------------------------------------
-
-template<typename I, typename  H>
-template<typename V>
-bool DataFrame<I, H>::is_strictly_monotonic_decreasing_(const V &column)  {
-
-    const size_type col_s = column.size();
-
-    for (size_type i = 1; i < col_s; ++i)
-        if (column[i] >= column[i - 1])
-            return(false);
-    return(true);
-}
-
-// ----------------------------------------------------------------------------
-
-template<typename I, typename  H>
-template<typename V>
-bool DataFrame<I, H>::
-is_normal_(const V &column, double epsilon, bool check_for_standard)  {
-
-    using value_type = typename V::value_type;
-
-    const I                     dummy_idx { I() };
-    StatsVisitor<value_type, I> svisit;
-
-    svisit.pre();
-    for (auto citer : column)
-        svisit(dummy_idx, citer);
-    svisit.post();
-
-    const value_type    mean = static_cast<value_type>(svisit.get_mean());
-    const value_type    std = static_cast<value_type>(svisit.get_std());
-    const value_type    high_band_1 = static_cast<value_type>(mean + std);
-    const value_type    low_band_1 = static_cast<value_type>(mean - std);
-    double              count_1 = 0.0;
-    const value_type    high_band_2 = static_cast<value_type>(mean + std * 2.0);
-    const value_type    low_band_2 = static_cast<value_type>(mean - std * 2.0);
-    double              count_2 = 0.0;
-    const value_type    high_band_3 = static_cast<value_type>(mean + std * 3.0);
-    const value_type    low_band_3 = static_cast<value_type>(mean - std * 3.0);
-    double              count_3 = 0.0;
-
-    for (auto citer : column)  {
-        if (citer >= low_band_1 && citer < high_band_1)  {
-            count_3 += 1;
-            count_2 += 1;
-            count_1 += 1;
-        }
-        else if (citer >= low_band_2 && citer < high_band_2)  {
-            count_3 += 1;
-            count_2 += 1;
-        }
-        else if (citer >= low_band_3 && citer < high_band_3)  {
-            count_3 += 1;
-        }
-    }
-
-    const double    col_s = static_cast<double>(column.size());
-
-    if (std::fabs((count_1 / col_s) - 0.68) <= epsilon &&
-        std::fabs((count_2 / col_s) - 0.95) <= epsilon &&
-        std::fabs((count_3 / col_s) - 0.997) <= epsilon)  {
-        if (check_for_standard)
-            return (std::fabs(mean - 0) <= epsilon &&
-                    std::fabs(std - 1.0) <= epsilon);
-        return (true);
-    }
-    return(false);
-}
-
-// ----------------------------------------------------------------------------
-
-template<typename I, typename  H>
-template<typename V>
-bool DataFrame<I, H>::is_lognormal_(const V &column, double epsilon)  {
-
-    using value_type = typename V::value_type;
-
-    const I                     dummy_idx { I() };
-    StatsVisitor<value_type, I> svisit;
-    StatsVisitor<value_type, I> log_visit;
-
-    svisit.pre();
-    for (auto citer : column)  {
-        svisit(dummy_idx, static_cast<value_type>(std::log(citer)));
-        log_visit(dummy_idx, citer);
-    }
-    svisit.post();
-
-    const value_type    mean = static_cast<value_type>(svisit.get_mean());
-    const value_type    std = static_cast<value_type>(svisit.get_std());
-    const value_type    high_band_1 = static_cast<value_type>(mean + std);
-    const value_type    low_band_1 = static_cast<value_type>(mean - std);
-    double              count_1 = 0.0;
-    const value_type    high_band_2 = static_cast<value_type>(mean + std * 2.0);
-    const value_type    low_band_2 = static_cast<value_type>(mean - std * 2.0);
-    double              count_2 = 0.0;
-    const value_type    high_band_3 = static_cast<value_type>(mean + std * 3.0);
-    const value_type    low_band_3 = static_cast<value_type>(mean - std * 3.0);
-    double              count_3 = 0.0;
-
-    for (auto citer : column)  {
-        const double    log_val = std::log(citer);
-
-        if (log_val >= low_band_1 && log_val < high_band_1)  {
-            count_3 += 1;
-            count_2 += 1;
-            count_1 += 1;
-        }
-        else if (log_val >= low_band_2 && log_val < high_band_2)  {
-            count_3 += 1;
-            count_2 += 1;
-        }
-        else if (log_val >= low_band_3 && log_val < high_band_3)  {
-            count_3 += 1;
-        }
-    }
-
-    const double    col_s = static_cast<double>(column.size());
-
-    if (std::fabs((count_1 / col_s) - 0.68) <= epsilon &&
-        std::fabs((count_2 / col_s) - 0.95) <= epsilon &&
-        std::fabs((count_3 / col_s) - 0.997) <= epsilon &&
-        log_visit.get_skew() > 10.0 * svisit.get_skew() &&
-        log_visit.get_kurtosis() > 10.0 * svisit.get_kurtosis())
-        return (true);
-    return(false);
-}
-
-// ----------------------------------------------------------------------------
-
-template<typename I, typename  H>
 template<typename T>
 bool DataFrame<I, H>::
 pattern_match(const char *col_name,
@@ -1784,19 +1071,19 @@ pattern_match(const char *col_name,
 
     switch(pattern)  {
     case pattern_spec::monotonic_increasing:
-        return (is_monotonic_increasing_(col));
+        return (is_monotonic_increasing(col));
     case pattern_spec::strictly_monotonic_increasing:
-        return (is_strictly_monotonic_increasing_(col));
+        return (is_strictly_monotonic_increasing(col));
     case pattern_spec::monotonic_decreasing:
-        return (is_monotonic_decreasing_(col));
+        return (is_monotonic_decreasing(col));
     case pattern_spec::strictly_monotonic_decreasing:
-        return (is_strictly_monotonic_decreasing_(col));
+        return (is_strictly_monotonic_decreasing(col));
     case pattern_spec::normally_distributed:
-        return (is_normal_(col, epsilon, false));
+        return (is_normal(col, epsilon, false));
     case pattern_spec::standard_normally_distributed:
-        return (is_normal_(col, epsilon, true));
+        return (is_normal(col, epsilon, true));
     case pattern_spec::lognormally_distributed:
-        return (is_lognormal_(col, epsilon));
+        return (is_lognormal(col, epsilon));
     default:
         throw NotImplemented("pattern_match(): "
                              "Requested pattern is not implemented");

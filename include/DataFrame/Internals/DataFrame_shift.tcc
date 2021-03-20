@@ -102,6 +102,23 @@ shift(size_type periods, shift_policy sp) const  {
 // ----------------------------------------------------------------------------
 
 template<typename I, typename H>
+template<typename T>
+std::vector<T> DataFrame<I, H>::
+shift(const char *col_name, size_type periods, shift_policy sp) const  {
+
+    static_assert(std::is_base_of<HeteroVector, DataVec>::value,
+                  "Only a StdDataFrame can call shift()");
+
+    std::vector<T>              result = get_column<T>(col_name);
+    vertical_shift_functor_<T>  functor(periods, sp);
+
+    functor (result);
+    return (result);
+}
+
+// ----------------------------------------------------------------------------
+
+template<typename I, typename H>
 template<typename ... Ts>
 void DataFrame<I, H>::self_rotate(size_type periods, shift_policy sp)  {
 
@@ -162,78 +179,6 @@ rotate(size_type periods, shift_policy sp) const  {
 
     slug.template self_rotate<Ts ...>(periods, sp);
     return (slug);
-}
-
-// ----------------------------------------------------------------------------
-
-template<typename I, typename H>
-template<typename V>
-void DataFrame<I, H>::shift_right_(V &vec, size_type n)  {
-
-    using value_type =
-        typename std::remove_reference<decltype(vec)>::type::value_type;
-
-    const auto  vec_rend = vec.rend();
-
-    for (auto riter = vec.rbegin(); riter != vec_rend; ++riter)
-        if (std::distance(riter, vec_rend) >
-            static_cast
-                <typename std::iterator_traits<decltype(riter)>::
-                    difference_type>(n))  {
-            *riter = std::move(*(riter + n));
-        }
-        else  {
-            *riter = std::move(_get_nan<value_type>());
-        }
-
-    return;
-}
-
-// ----------------------------------------------------------------------------
-
-template<typename I, typename H>
-template<typename V>
-void DataFrame<I, H>::shift_left_(V &vec, size_type n)  {
-
-    using value_type =
-        typename std::remove_reference<decltype(vec)>::type::value_type;
-
-    const auto  vec_end = vec.end();
-
-    for (auto iter = vec.begin(); iter != vec_end; ++iter)
-        if (std::distance(iter, vec_end) >
-            static_cast
-                <typename std::iterator_traits<decltype(iter)>::
-                    difference_type>(n))  {
-            *iter = std::move(*(iter + n));
-        }
-        else  {
-            *iter = std::move(_get_nan<value_type>());
-        }
-
-    return;
-}
-
-// ----------------------------------------------------------------------------
-
-template<typename I, typename H>
-template<typename V>
-void DataFrame<I, H>::rotate_right_(V &vec, size_type n)  {
-
-    // There is no checking the value of n
-    std::rotate(vec.rbegin(), vec.rbegin() + n, vec.rend());
-    return;
-}
-
-// ----------------------------------------------------------------------------
-
-template<typename I, typename H>
-template<typename V>
-void DataFrame<I, H>::rotate_left_(V &vec, size_type n)  {
-
-    // There is no checking the value of n
-    std::rotate(vec.begin(), vec.begin() + n, vec.end());
-    return;
 }
 
 } // namespace hmdf

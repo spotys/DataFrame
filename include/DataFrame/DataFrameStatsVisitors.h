@@ -32,12 +32,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <DataFrame/DataFrameTypes.h>
 #include <DataFrame/Internals/DataFrame_standalone.tcc>
 #include <DataFrame/Utils/FixedSizePriorityQueue.h>
+#include <DataFrame/Utils/Utils.h>
 
 #include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <cstddef>
 #include <functional>
+#include <future>
 #include <iterator>
 #include <map>
 #include <numeric>
@@ -81,12 +83,100 @@ namespace hmdf
             (*this)(*idx_begin, *column_begin1++, *column_begin2++); \
     }
 
+#define DECL_CTOR(name) \
+    explicit \
+    name(bool skipnan = true) : skip_nan_(skipnan)  {   }
+
 #define SKIP_NAN if (skip_nan_ && is_nan__(val))  { return; }
 
 #define GET_COL_SIZE \
-        const size_t    col_s = \
-            std::min(std::distance(idx_begin, idx_end), \
-                     std::distance(column_begin, column_end));
+    const std::size_t   col_s = \
+        std::min(std::distance(idx_begin, idx_end), \
+                 std::distance(column_begin, column_end));
+
+// ----------------------------------------------------------------------------
+
+template<typename T, typename I = unsigned long>
+struct LastVisitor {
+
+    DEFINE_VISIT_BASIC_TYPES_2
+
+    inline void
+    operator() (const index_type &, const value_type &val)  {
+
+        if (! skip_nan_ || ! is_nan__(val))  result_ = val;
+    }
+    PASS_DATA_ONE_BY_ONE
+
+    inline void pre ()  { result_ = result_type { }; }
+    inline void post ()  {  }
+    inline result_type get_result () const  { return (result_); }
+
+    DECL_CTOR(LastVisitor)
+
+private:
+
+    result_type result_ {  };
+    const bool  skip_nan_;
+};
+
+// ----------------------------------------------------------------------------
+
+template<typename T, typename I = unsigned long>
+struct FirstVisitor {
+
+    DEFINE_VISIT_BASIC_TYPES_2
+
+    inline void
+    operator() (const index_type &, const value_type &val)  {
+
+        if (! started_)  {  
+            if (! skip_nan_ || ! is_nan__(val))  {
+                result_ = val;
+                started_ = true;
+            }
+        }
+    }
+    PASS_DATA_ONE_BY_ONE
+
+    inline void pre ()  { result_ = result_type { }; started_ = false; }
+    inline void post ()  {  }
+    inline result_type get_result () const  { return (result_); }
+
+    DECL_CTOR(FirstVisitor)
+
+private:
+
+    result_type result_ {  };
+    bool        started_ { false };
+    const bool  skip_nan_;
+};
+
+// ----------------------------------------------------------------------------
+
+template<typename T, typename I = unsigned long>
+struct CountVisitor {
+
+    DEFINE_VISIT_BASIC_TYPES
+    using result_type = std::size_t;
+
+    inline void operator() (const index_type &, const value_type &val)  {
+
+        if (! skip_nan_ || ! is_nan__(val))  count_ += 1;
+    }
+    PASS_DATA_ONE_BY_ONE
+
+    inline void pre ()  { count_ = 0; }
+    inline void post ()  {  }
+    inline result_type get_result () const  { return (count_); }
+
+    DECL_CTOR(CountVisitor)
+
+private:
+
+    result_type count_ { 0 };
+    const bool  skip_nan_;
+};
 
 // ----------------------------------------------------------------------------
 
@@ -99,18 +189,50 @@ struct MeanVisitor {
 
         SKIP_NAN
 
-        sum_ += val;
         cnt_ += 1;
+        sum_ += val;
     }
     PASS_DATA_ONE_BY_ONE
 
-    inline void pre ()  { sum_ = 0; mean_ = 0; cnt_ = 0; }
+    inline void pre ()  { sum_ = mean_ = 0; cnt_ = 0; }
     inline void post ()  { mean_ = sum_ / value_type(cnt_); }
     inline size_type get_count () const  { return (cnt_); }
     inline value_type get_sum () const  { return (sum_); }
     inline result_type get_result () const  { return (mean_); }
 
-    explicit MeanVisitor(bool skipnan = true) : skip_nan_(skipnan)  {   }
+    DECL_CTOR(MeanVisitor)
+
+private:
+
+    value_type  sum_ { 0 };
+    value_type  mean_ { 0 };
+    size_type   cnt_ { 0 };
+    const bool  skip_nan_;
+};
+
+// ----------------------------------------------------------------------------
+
+template<typename T, typename I = unsigned long>
+struct WeightedMeanVisitor {
+
+    DEFINE_VISIT_BASIC_TYPES_2
+
+    inline void operator() (const index_type &, const value_type &val)  {
+
+        SKIP_NAN
+
+        cnt_ += 1;
+        sum_ += val * value_type(cnt_);
+    }
+    PASS_DATA_ONE_BY_ONE
+
+    inline void pre()  { sum_ = mean_ = 0; cnt_ = 0; }
+    inline void post() { mean_ = sum_ / value_type((cnt_ * (cnt_ + 1)) / 2); }
+    inline size_type get_count() const  { return (cnt_); }
+    inline value_type get_sum() const  { return (sum_); }
+    inline result_type get_result() const  { return (mean_); }
+
+    DECL_CTOR(WeightedMeanVisitor)
 
 private:
 
@@ -131,19 +253,18 @@ struct GeometricMeanVisitor {
 
         SKIP_NAN
 
-        sum_ += std::log(val);
         cnt_ += 1;
+        sum_ += std::log(val);
     }
     PASS_DATA_ONE_BY_ONE
 
-    inline void pre ()  { sum_ = 0; mean_ = 0; cnt_ = 0; }
+    inline void pre ()  { sum_ = mean_ = 0; cnt_ = 0; }
     inline void post ()  { mean_ = std::exp(sum_ / value_type(cnt_)); }
     inline size_type get_count () const  { return (cnt_); }
     inline value_type get_sum () const  { return (sum_); }
     inline result_type get_result () const  { return (mean_); }
 
-    explicit
-    GeometricMeanVisitor(bool skipnan = true) : skip_nan_(skipnan)  {   }
+    DECL_CTOR(GeometricMeanVisitor)
 
 private:
 
@@ -155,10 +276,7 @@ private:
 
 // ----------------------------------------------------------------------------
 
-template<typename T,
-         typename I = unsigned long,
-         typename =
-             typename std::enable_if<std::is_arithmetic<T>::value, T>::type>
+template<typename T, typename I = unsigned long>
 struct HarmonicMeanVisitor {
 
     DEFINE_VISIT_BASIC_TYPES_2
@@ -167,19 +285,51 @@ struct HarmonicMeanVisitor {
 
         SKIP_NAN
 
-        sum_ += value_type(1) / val;
         cnt_ += 1;
+        sum_ += one_ / val;
     }
     PASS_DATA_ONE_BY_ONE
 
-    inline void pre ()  { sum_ = 0; mean_ = 0; cnt_ = 0; }
+    inline void pre ()  { sum_ = mean_ = 0; cnt_ = 0; }
     inline void post ()  { mean_ = value_type(cnt_) / sum_; }
     inline size_type get_count () const  { return (cnt_); }
     inline value_type get_sum () const  { return (sum_); }
     inline result_type get_result () const  { return (mean_); }
 
-    explicit
-    HarmonicMeanVisitor(bool skipnan = true) : skip_nan_(skipnan)  {   }
+    DECL_CTOR(HarmonicMeanVisitor)
+
+private:
+
+    value_type                  sum_ { 0 };
+    value_type                  mean_ { 0 };
+    size_type                   cnt_ { 0 };
+    const bool                  skip_nan_;
+    static constexpr value_type one_ { 1 };
+};
+
+// ----------------------------------------------------------------------------
+
+template<typename T, typename I = unsigned long>
+struct QuadraticMeanVisitor {
+
+    DEFINE_VISIT_BASIC_TYPES_2
+
+    inline void operator() (const index_type &, const value_type &val)  {
+
+        SKIP_NAN
+
+        cnt_ += 1;
+        sum_ += val * val;
+    }
+    PASS_DATA_ONE_BY_ONE
+
+    inline void pre()  { sum_ = mean_ = 0; cnt_ = 0; }
+    inline void post() { mean_ = std::sqrt(sum_ / value_type(cnt_)); }
+    inline size_type get_count() const  { return (cnt_); }
+    inline value_type get_sum() const  { return (sum_); }
+    inline result_type get_result() const  { return (mean_); }
+
+    DECL_CTOR(QuadraticMeanVisitor)
 
 private:
 
@@ -208,7 +358,7 @@ struct SumVisitor {
     inline void post ()  {  }
     inline result_type get_result () const  { return (sum_); }
 
-    explicit SumVisitor(bool skipnan = true) : skip_nan_(skipnan)  {   }
+    DECL_CTOR(SumVisitor)
 
 private:
 
@@ -235,7 +385,7 @@ struct ProdVisitor {
     inline void post ()  {  }
     inline result_type get_result () const  { return (prod_); }
 
-    explicit ProdVisitor(bool skipnan = true) : skip_nan_(skipnan)  {   }
+    DECL_CTOR(ProdVisitor)
 
 private:
 
@@ -254,6 +404,7 @@ struct ExtremumVisitor {
 
     inline void operator() (const index_type &idx, const value_type &val)  {
 
+        counter_ += 1;
         if (is_nan__(val))  {
             if (skip_nan_)  return;
             else  {
@@ -265,23 +416,27 @@ struct ExtremumVisitor {
         if (cmp_(extremum_, val) || is_first) {
             extremum_ = val;
             index_ = idx;
+            pos_ = counter_;
             is_first = false;
         }
     }
     PASS_DATA_ONE_BY_ONE
 
-    inline void pre ()  { is_first = true; }
+    inline void pre ()  { is_first = true; pos_ = 0; counter_ = 0; }
     inline void post ()  {  }
     inline result_type get_result () const  { return (extremum_); }
     inline index_type get_index () const  { return (index_); }
+    inline size_type get_position () const  { return (pos_); }
 
-    explicit ExtremumVisitor(bool skipnan = true) : skip_nan_(skipnan)  {   }
+    DECL_CTOR(ExtremumVisitor)
 
 private:
 
     value_type      extremum_ { };
     index_type      index_ { };
     bool            is_first { true };
+    size_type       pos_ { 0 };
+    size_type       counter_ { 0 };
     compare_type    cmp_ {  };
     const bool      skip_nan_;
 };
@@ -357,7 +512,7 @@ struct  NExtremumVisitor {
                   });
     }
 
-    explicit NExtremumVisitor(bool skipnan = true) : skip_nan_(skipnan)  {   }
+    DECL_CTOR(NExtremumVisitor)
 
 private:
 
@@ -654,7 +809,7 @@ struct DotProdVisitor  {
     }
     PASS_DATA_ONE_BY_ONE_2
 
-    inline void pre ()  { dot_prod_ = value_type(0); }
+    inline void pre ()  { dot_prod_ = 0; }
     inline void post ()  {  }
     inline result_type get_result () const  { return (dot_prod_); }
 
@@ -836,7 +991,7 @@ private:
     using f_result_type = typename visitor_type::result_type;
 
     visitor_type                visitor_ { };
-    const size_t                roll_count_ { 0 };
+    const std::size_t           roll_count_ { 0 };
     std::vector<f_result_type>  result_ { };
 
 public:
@@ -851,7 +1006,7 @@ public:
                 const H &column_begin,
                 const H &column_end)  {
 
-        if (roll_count_ == 0)  return;
+        assert(roll_count_ != 0);
 
         GET_COL_SIZE
 
@@ -891,8 +1046,8 @@ private:
 
     using visitor_type = F;
 
-    visitor_type    visitor_ {  };
-    const size_t    period_;
+    visitor_type        visitor_ {  };
+    const std::size_t   period_;
 
 public:
 
@@ -941,8 +1096,8 @@ private:
     using f_result_type = typename visitor_type::result_type;
 
     visitor_type                visitor_ { };
-    const size_t                init_roll_count_ { 0 };
-    const size_t                increment_count_ { 0 };
+    const std::size_t           init_roll_count_ { 0 };
+    const std::size_t           increment_count_ { 0 };
     std::vector<f_result_type>  result_ { };
 
 public:
@@ -957,22 +1112,22 @@ public:
                 const H &column_begin,
                 const H &column_end)  {
 
-        if (init_roll_count_ == 0)  return;
+        assert(init_roll_count_ != 0);
 
         GET_COL_SIZE
 
         result_.reserve(col_s);
 
-        size_t  rc = init_roll_count_;
+        std::size_t rc = init_roll_count_;
 
-        for (size_t i = 0; i < rc - 1 && i < col_s; ++i)
+        for (std::size_t i = 0; i < rc - 1 && i < col_s; ++i)
             result_.push_back(std::numeric_limits<f_result_type>::quiet_NaN());
 
-        for (size_t i = 0; i < col_s; ++i, rc += increment_count_)  {
-            size_t  r = 0;
+        for (std::size_t i = 0; i < col_s; ++i, rc += increment_count_)  {
+            std::size_t r = 0;
 
             visitor_.pre();
-            for (size_t j = i; r < rc && j < col_s; ++j, ++r)
+            for (std::size_t j = i; r < rc && j < col_s; ++j, ++r)
                 visitor_(*(idx_begin + j), *(column_begin + j));
             visitor_.post();
             if (r == rc)
@@ -986,7 +1141,9 @@ public:
     inline const result_type &get_result () const  { return (result_); }
     inline result_type &get_result ()  { return (result_); }
 
-    ExpandingRollAdopter(F &&functor, size_t r_count, size_t i_count = 1)
+    ExpandingRollAdopter(F &&functor,
+                         std::size_t r_count,
+                         std::size_t i_count = 1)
         : visitor_(std::move(functor)),
           init_roll_count_(r_count),
           increment_count_(i_count)  {   }
@@ -1007,13 +1164,15 @@ private:
 
     std::vector<f_result_type>  result_ { };
     visitor_type                visitor_ { };
-    const size_t                roll_count_;
+    const std::size_t           roll_count_;
+    const std::size_t           repeat_count_;
     const double                decay_;
     const bool                  skip_nan_;
 
 public:
 
     DEFINE_VISIT_BASIC_TYPES
+
     using result_type = std::vector<f_result_type>;
 
     template <typename K, typename H>
@@ -1025,25 +1184,27 @@ public:
 
         GET_COL_SIZE
 
-        if (roll_count_ == 0 || roll_count_ >= col_s)  return;
+        assert(roll_count_ != 0 && roll_count_ < col_s);
 
         result_.resize(col_s, std::numeric_limits<f_result_type>::quiet_NaN());
 
-        size_t  i = 0;
+        std::size_t i = 0;
 
         visitor_.pre();
         for (; i < roll_count_; ++i)
             visitor_(*(idx_begin + i), *(column_begin + i));
         visitor_.post();
-        result_[--i] = visitor_.get_result();
-        i += 1;
+        result_[i - 1] = visitor_.get_result();
 
         for (; i < col_s; ++i)  {
             if (skip_nan_ && is_nan__(*(column_begin + i)))  continue;
-            result_[i] =
-                decay_ * *(column_begin + i) +
-                ((1.0 - decay_) * result_[i - 1]);
+            result_[i] = calc_value_(*(column_begin + i), result_[i - 1]);
         }
+        for (i = 1; i < repeat_count_; ++i)
+            for (std::size_t j = roll_count_; j < col_s; ++j)  {
+                if (skip_nan_ && is_nan__(result_[i]))  continue;
+                result_[j] = calc_value_(result_[j], result_[j - 1]);
+            }
     }
 
     inline void pre ()  { visitor_.pre(); result_.clear(); }
@@ -1052,12 +1213,14 @@ public:
     inline result_type &get_result ()  { return (result_); }
 
     ExponentialRollAdopter(F &&functor,
-                           size_t r_count,
+                           std::size_t r_count,
                            exponential_decay_spec eds,
                            double value,
+                           std::size_t repeat_count = 1,
                            bool skip_nan = true)
         : visitor_(std::move(functor)),
           roll_count_(r_count),
+          repeat_count_(repeat_count),
           decay_(eds == exponential_decay_spec::center_of_gravity
                      ? 1.0 / (1.0 + value)
                      : eds == exponential_decay_spec::span
@@ -1066,6 +1229,13 @@ public:
                              ? 1.0 - std::exp(std::log(0.5) / value)
                              : value),
           skip_nan_(skip_nan)  {   }
+
+private:
+
+    inline value_type calc_value_(value_type i_value, value_type i_1_value)  {
+
+        return (decay_ * i_value + (1.0 - decay_) * i_1_value);
+    }
 };
 
 // ----------------------------------------------------------------------------
@@ -1105,7 +1275,7 @@ struct StatsVisitor  {
     inline void pre ()  {
 
         n_ = 0;
-        m1_ = m2_ = m3_ = m4_ = value_type(0);
+        m1_ = m2_ = m3_ = m4_ = 0;
     }
     inline void post ()  {  }
 
@@ -1129,7 +1299,7 @@ struct StatsVisitor  {
             (value_type(n_) * m4_ / (m2_ * m2_) - 3.0);
     }
 
-    explicit StatsVisitor(bool skipnan = true) : skip_nan_(skipnan)  {   }
+    DECL_CTOR(StatsVisitor)
 
 private:
 
@@ -1304,60 +1474,6 @@ private:
 // Single Action Visitors
 //
 
-template<typename T, typename I = unsigned long>
-struct LastVisitor {
-
-    DEFINE_VISIT_BASIC_TYPES_2
-
-    template <typename K, typename H>
-    inline void
-    operator() (const K &idx_begin,
-                const K &idx_end,
-                const H &column_begin,
-                const H &column_end)  {
-
-        if (std::distance(column_begin, column_end) > 0)
-            result_ = *(column_end - 1);
-    }
-
-    inline void pre ()  { result_ = result_type { }; }
-    inline void post ()  {  }
-    inline result_type get_result () const  { return (result_); }
-
-private:
-
-    result_type result_ {  };
-};
-
-// ----------------------------------------------------------------------------
-
-template<typename T, typename I = unsigned long>
-struct FirstVisitor {
-
-    DEFINE_VISIT_BASIC_TYPES_2
-
-    template <typename K, typename H>
-    inline void
-    operator() (const K &idx_begin,
-                const K &idx_end,
-                const H &column_begin,
-                const H &column_end)  {
-
-        if (std::distance(column_begin, column_end) > 0)
-            result_ = *column_begin;
-    }
-
-    inline void pre ()  { result_ = result_type { }; }
-    inline void post ()  {  }
-    inline result_type get_result () const  { return (result_); }
-
-private:
-
-    result_type result_ {  };
-};
-
-// ----------------------------------------------------------------------------
-
 template<typename T,
          typename I = unsigned long,
          typename =
@@ -1393,7 +1509,7 @@ struct CumSumVisitor {
     inline void post ()  {  }
     inline const result_type &get_result () const  { return (sum_); }
 
-    explicit CumSumVisitor(bool skipnan = true) : skip_nan_(skipnan)  {   }
+    DECL_CTOR(CumSumVisitor)
 
 private:
 
@@ -1439,7 +1555,7 @@ struct CumProdVisitor {
     inline const result_type &get_result () const  { return (prod_); }
     inline result_type &get_result ()  { return (prod_); }
 
-    explicit CumProdVisitor(bool skipnan = true) : skip_nan_(skipnan)  {   }
+    DECL_CTOR(CumProdVisitor)
 
 private:
 
@@ -1488,7 +1604,7 @@ struct CumExtremumVisitor {
     inline const result_type &get_result () const  { return (extremum_); }
     inline result_type &get_result ()  { return (extremum_); }
 
-    explicit CumExtremumVisitor(bool skipnan = true) : skip_nan_(skipnan)  {  }
+    DECL_CTOR(CumExtremumVisitor)
 
 private:
 
@@ -1948,7 +2064,7 @@ struct QuantileVisitor  {
             ! (col_s & 0x01) || double(int_idx) < vec_len_frac;
 
         if (qt_ == 0.0 || qt_ == 1.0)  {
-            KthValueVisitor<T, I>   kth_value((qt_ == 0.0 ) ? 1 : col_s);
+            KthValueVisitor<T, I>   kth_value((qt_ == 0.0) ? 1 : col_s);
 
             kth_value.pre();
             kth_value(idx_begin, idx_end, column_begin, column_end);
@@ -2342,6 +2458,10 @@ struct DiffVisitor  {
 
         GET_COL_SIZE
 
+        assert(col_s > 0 && std::abs(periods_) < (col_s - 1));
+
+        bool    there_is_zero = false;
+
         result_.reserve(col_s);
         if (periods_ >= 0)  {
             if (! skip_nan_)  {
@@ -2351,33 +2471,53 @@ struct DiffVisitor  {
                         std::numeric_limits<value_type>::quiet_NaN());
             }
 
-            auto    i = column_begin;
+            auto    i = column_begin + periods_;
 
-            i += periods_;
             for (auto j = column_begin; i < column_end; ++i, ++j) {
                 if (skip_nan_ && (is_nan__(*i) || is_nan__(*j)))  continue;
-                result_.push_back(*i - *j);
+
+                const value_type    val = *i - *j;
+
+                result_.push_back(val);
+                if (val == 0)  there_is_zero = true;
             }
         }
         else {
-            auto    i = column_end;
-            auto    j = column_end;
+            auto    i = column_end - (1 + std::abs(periods_));
+            auto    j = column_end - 1;
 
-            i -= (1 + std::abs(periods_));
-            j -= 1;
-            for ( ; i >= column_begin; --i, --j) {
+            for ( ; i > column_begin; --i, --j) {
                 if (skip_nan_ && (is_nan__(*i) || is_nan__(*j)))  continue;
-                result_.push_back(*i - *j);
+
+                const value_type    val = *i - *j;
+
+                result_.push_back(val);
+                if (val == 0)  there_is_zero = true;
+            }
+            if (i == column_begin)  {
+                if (! (skip_nan_ && (is_nan__(*i) || is_nan__(*j))))  {
+                    const value_type    val = *i - *j;
+
+                    result_.push_back(val);
+                    if (val == 0)  there_is_zero = true;
+                }
             }
             std::reverse(result_.begin(), result_.end());
 
-            if (skip_nan_ )  return;
-            for (size_type i = 0;
-                 i < static_cast<size_type>(std::abs(periods_)) && i < col_s;
-                 ++i)
-                result_.push_back(
-                    std::numeric_limits<value_type>::quiet_NaN());
+            if (! skip_nan_)
+                for (size_type i = 0;
+                     i < static_cast<size_type>(std::abs(periods_)) &&
+                         i < col_s;
+                     ++i)
+                    result_.push_back(
+                        std::numeric_limits<value_type>::quiet_NaN());
         }
+
+        if (non_zero_ && there_is_zero)
+            std::for_each(result_.begin(), result_.end(),
+                          [](value_type &v) {
+                              v += std::numeric_limits<value_type>::epsilon();
+                          });
     }
 
     inline void pre ()  { result_.clear(); }
@@ -2385,14 +2525,16 @@ struct DiffVisitor  {
     inline const result_type &get_result () const  { return (result_); }
     inline result_type &get_result ()  { return (result_); }
 
-    explicit DiffVisitor(long periods = 1, bool skipnan = true)
-        : periods_(periods), skip_nan_(skipnan) {  }
+    explicit
+    DiffVisitor(long periods = 1, bool skipnan = true, bool non_zero = false)
+        : periods_(periods), skip_nan_(skipnan), non_zero_(non_zero) {  }
 
 private:
 
     result_type result_ { };
     const long  periods_;
     const bool  skip_nan_;
+    const bool  non_zero_;
 };
 
 // ----------------------------------------------------------------------------
@@ -2440,7 +2582,7 @@ struct ZScoreVisitor {
     inline const result_type &get_result () const  { return (zscore_); }
     inline result_type &get_result ()  { return (zscore_); }
 
-    explicit ZScoreVisitor(bool skipnan = true) : skip_nan_(skipnan)  {   }
+    DECL_CTOR(ZScoreVisitor)
 
 private:
 
@@ -2503,8 +2645,7 @@ struct SampleZScoreVisitor {
     inline void post ()  {  }
     inline result_type get_result () const  { return (zscore_); }
 
-    explicit
-    SampleZScoreVisitor(bool skipnan = true) : skip_nan_(skipnan)  {   }
+    DECL_CTOR(SampleZScoreVisitor)
 
 private:
 
@@ -2776,7 +2917,7 @@ private:
     const box_cox_type          box_cox_type_;
     const value_type            lambda_;
     const bool                  is_all_positive_;
-    static constexpr value_type one_ { value_type(1) };
+    static constexpr value_type one_ { 1 };
 };
 
 // ----------------------------------------------------------------------------
@@ -3193,11 +3334,11 @@ private:
         if (median_v.get_result() == 0)  {
             std::replace_if(resid_weights_.begin(), resid_weights_.end(),
                             std::bind(std::greater<value_type>(),
-                                      std::placeholders::_1, value_type(0)),
+                                      std::placeholders::_1, z_),
                             one_);
         }
         else  {
-            const value_type    val = value_type(6) * median_v.get_result();
+            const value_type    val = six_ * median_v.get_result();
 
             std::transform(resid_weights_.begin(), resid_weights_.end(),
                            resid_weights_.begin(),
@@ -3216,7 +3357,7 @@ private:
         // std::replace_if(resid_weights_.begin(), resid_weights_.end(),
         //                 std::bind(std::less_equal<value_type>(),
         //                           std::placeholders::_1, value_type(0.001)),
-        //                 value_type(0));
+        //                 z_);
         bi_square_(resid_weights_.begin(), resid_weights_.end());
     }
 
@@ -3425,7 +3566,7 @@ private:
         while (true)  {
             if (right_end < curr_idx)  {
                 if (xval > ((*(x_begin + left_end) +
-                             *(x_begin + right_end)) / value_type(2)))  {
+                             *(x_begin + right_end)) / two_))  {
                     left_end += 1;
                     right_end += 1;
                 }
@@ -3578,7 +3719,7 @@ public:
 
     explicit
     LowessVisitor (size_type loop_n = 3,
-                   value_type frac = value_type(2) / value_type(3),
+                   value_type frac = two_ / three_,
                    value_type delta = 0,
                    bool sorted = false)
         : frac_(frac),
@@ -3605,7 +3746,11 @@ private:
     result_type                 auxiliary_vec_ {  };
     result_type                 x_j_ {  };
     result_type                 dist_i_j_ {  };
-    static constexpr value_type one_ { value_type (1) };
+    static constexpr value_type z_ { 0 };
+    static constexpr value_type one_ { 1 };
+    static constexpr value_type two_ { 2 };
+    static constexpr value_type three_ { 3 };
+    static constexpr value_type six_ { 6 };
 };
 
 // ----------------------------------------------------------------------------
@@ -3776,6 +3921,180 @@ private:
     result_type             seasonal_ {  };
     result_type             residual_ {  };
 };
+
+// ----------------------------------------------------------------------------
+
+template<typename T, typename I = unsigned long>
+struct  EntropyVisitor  {
+
+    DEFINE_VISIT_BASIC_TYPES_3
+
+    template <typename K, typename H>
+    inline void
+    operator() (const K &idx_begin,
+                const K &idx_end,
+                const H &column_begin,
+                const H &column_end)  {
+
+        if (roll_count_ == 0)  return;
+
+        GET_COL_SIZE
+
+        SimpleRollAdopter<SumVisitor<T, I>, T, I>   sum_v (SumVisitor<T, I>(),
+                                                           roll_count_);
+
+        sum_v.pre();
+        sum_v (idx_begin, idx_end, column_begin, column_end);
+        sum_v.post();
+        result_ = std::move(sum_v.get_result());
+
+        for (size_type i = 0; i < col_s; ++i)  {
+            const value_type    val = *(column_begin + i) / result_[i];
+
+            result_[i] = (-val * std::log(val) / std::log(log_base_));
+        }
+
+        sum_v.pre();
+        sum_v (idx_begin + (roll_count_ - 1), idx_end,
+               result_.begin() + (roll_count_ - 1), result_.end());
+        sum_v.post();
+
+        for (size_type i = 0; i < roll_count_ - 1; ++i)
+            result_[i] = get_nan<value_type>();
+        for (size_type i = 0; i < sum_v.get_result().size(); ++i)
+            result_[i + roll_count_ - 1] = sum_v.get_result()[i];
+    }
+
+    inline void pre ()  { result_.clear(); }
+    inline void post ()  {  }
+    inline const result_type &get_result () const  { return (result_); }
+    inline result_type &get_result ()  { return (result_); }
+
+    explicit
+    EntropyVisitor(size_type roll_count, value_type log_base = 2)
+        : roll_count_(roll_count), log_base_(log_base)  {   }
+
+private:
+
+    const size_type     roll_count_;
+    const value_type    log_base_;
+    result_type         result_ { };
+};
+
+// ----------------------------------------------------------------------------
+
+template<typename V>
+inline bool
+is_normal(const V &column, double epsl, bool check_for_standard)  {
+
+    using value_type = typename V::value_type;
+
+    const int                       dummy_idx { int() };
+    StatsVisitor<value_type, int>   svisit;
+
+    svisit.pre();
+    for (auto citer : column)
+        svisit(dummy_idx, citer);
+    svisit.post();
+
+    const value_type    mean = static_cast<value_type>(svisit.get_mean());
+    const value_type    std = static_cast<value_type>(svisit.get_std());
+    const value_type    high_band_1 = static_cast<value_type>(mean + std);
+    const value_type    low_band_1 = static_cast<value_type>(mean - std);
+    double              count_1 = 0.0;
+    const value_type    high_band_2 = static_cast<value_type>(mean + std * 2.0);
+    const value_type    low_band_2 = static_cast<value_type>(mean - std * 2.0);
+    double              count_2 = 0.0;
+    const value_type    high_band_3 = static_cast<value_type>(mean + std * 3.0);
+    const value_type    low_band_3 = static_cast<value_type>(mean - std * 3.0);
+    double              count_3 = 0.0;
+
+    for (auto citer : column)  {
+        if (citer >= low_band_1 && citer < high_band_1)  {
+            count_3 += 1;
+            count_2 += 1;
+            count_1 += 1;
+        }
+        else if (citer >= low_band_2 && citer < high_band_2)  {
+            count_3 += 1;
+            count_2 += 1;
+        }
+        else if (citer >= low_band_3 && citer < high_band_3)  {
+            count_3 += 1;
+        }
+    }
+
+    const double    col_s = static_cast<double>(column.size());
+
+    if (std::fabs((count_1 / col_s) - 0.68) <= epsl &&
+        std::fabs((count_2 / col_s) - 0.95) <= epsl &&
+        std::fabs((count_3 / col_s) - 0.997) <= epsl)  {
+        if (check_for_standard)
+            return (std::fabs(mean - 0) <= epsl &&
+                    std::fabs(std - 1.0) <= epsl);
+        return (true);
+    }
+    return (false);
+}
+
+// ----------------------------------------------------------------------------
+
+template<typename V>
+inline bool
+is_lognormal(const V &column, double epsl)  {
+
+    using value_type = typename V::value_type;
+
+    const int                       dummy_idx { int() };
+    StatsVisitor<value_type, int>   svisit;
+    StatsVisitor<value_type, int>   log_visit;
+
+    svisit.pre();
+    for (auto citer : column)  {
+        svisit(dummy_idx, static_cast<value_type>(std::log(citer)));
+        log_visit(dummy_idx, citer);
+    }
+    svisit.post();
+
+    const value_type    mean = static_cast<value_type>(svisit.get_mean());
+    const value_type    std = static_cast<value_type>(svisit.get_std());
+    const value_type    high_band_1 = static_cast<value_type>(mean + std);
+    const value_type    low_band_1 = static_cast<value_type>(mean - std);
+    double              count_1 = 0.0;
+    const value_type    high_band_2 = static_cast<value_type>(mean + std * 2.0);
+    const value_type    low_band_2 = static_cast<value_type>(mean - std * 2.0);
+    double              count_2 = 0.0;
+    const value_type    high_band_3 = static_cast<value_type>(mean + std * 3.0);
+    const value_type    low_band_3 = static_cast<value_type>(mean - std * 3.0);
+    double              count_3 = 0.0;
+
+    for (auto citer : column)  {
+        const auto  log_val = std::log(citer);
+
+        if (log_val >= low_band_1 && log_val < high_band_1)  {
+            count_3 += 1;
+            count_2 += 1;
+            count_1 += 1;
+        }
+        else if (log_val >= low_band_2 && log_val < high_band_2)  {
+            count_3 += 1;
+            count_2 += 1;
+        }
+        else if (log_val >= low_band_3 && log_val < high_band_3)  {
+            count_3 += 1;
+        }
+    }
+
+    const double    col_s = static_cast<double>(column.size());
+
+    if (std::fabs((count_1 / col_s) - 0.68) <= epsl &&
+        std::fabs((count_2 / col_s) - 0.95) <= epsl &&
+        std::fabs((count_3 / col_s) - 0.997) <= epsl &&
+        log_visit.get_skew() > 10.0 * svisit.get_skew() &&
+        log_visit.get_kurtosis() > 10.0 * svisit.get_kurtosis())
+        return (true);
+    return (false);
+}
 
 } // namespace hmdf
 

@@ -29,10 +29,215 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #pragma once
 
+#include <tuple>
+#include <utility>
+
 // ----------------------------------------------------------------------------
 
 namespace hmdf
 {
+
+template<typename DF, typename T>
+static inline auto &
+_create_column_from_triple_(DF &df, T &triple) {
+
+    using ValueType = typename std::tuple_element<2, T>::type::result_type;
+
+    return (df.template create_column<ValueType>(std::get<1>(triple)));
+}
+
+// ----------------------------------------------------------------------------
+
+template<typename DF, typename T, typename V>
+static inline void
+_load_groupby_data_1_(const DF &source,
+                      DF &dest,
+                      T &triple,
+                      const V &input_v,
+                      const std::vector<std::size_t> &sort_v,
+                      const char *col_name) {
+
+    std::size_t         marker = 0;
+    auto                &dst_idx = dest.get_index();
+    const std::size_t   vec_size = input_v.size();
+    const auto          &src_idx = source.get_index();
+
+    if (dst_idx.empty())  {
+        using ColValueType = typename V::value_type;
+
+        auto    *col_vec =
+            ::strcmp(col_name, DF_INDEX_COL_NAME)
+                ? &(dest.template create_column<ColValueType>(col_name))
+                : nullptr;
+
+        dst_idx.reserve(vec_size / 2 + 1);
+        if (col_vec)  col_vec->reserve(vec_size / 2 + 1);
+        for (std::size_t i = 0; i < vec_size; ++i)  {
+            if (input_v[sort_v[i]] != input_v[sort_v[marker]])  {
+                dst_idx.push_back(src_idx[sort_v[i - 1]]);
+                if (col_vec)  col_vec->push_back(input_v[sort_v[i - 1]]);
+                marker = i;
+            }
+        }
+        if (marker < vec_size - 1)  {
+            dst_idx.push_back(src_idx[sort_v[vec_size - 1]]);
+            if (col_vec)  col_vec->push_back(input_v[sort_v[vec_size - 1]]);
+        }
+    }
+
+    using ValueType = typename std::tuple_element<2, T>::type::value_type;
+
+    const auto          &src_vec =
+        source.template get_column<ValueType>(std::get<0>(triple));
+    const std::size_t   max_count = std::min(vec_size, src_vec.size());
+    auto                &dst_vec = _create_column_from_triple_(dest, triple);
+    auto                &visitor = std::get<2>(triple);
+
+    dst_vec.reserve(max_count / 2 + 1);
+    marker = 0;
+    for (std::size_t i = 0; i < max_count; ++i)  {
+        if (input_v[sort_v[i]] != input_v[sort_v[marker]])  {
+            visitor.pre();
+            for (std::size_t j = marker; j < i; ++j)
+                visitor(src_idx[sort_v[j]], src_vec[sort_v[j]]);
+            visitor.post();
+            dst_vec.push_back(visitor.get_result());
+            marker = i;
+        }
+    }
+    if (marker < max_count)  {
+        visitor.pre();
+        for (std::size_t j = marker; j < max_count; ++j)
+            visitor(src_idx[sort_v[j]], src_vec[sort_v[j]]);
+        visitor.post();
+        dst_vec.push_back(visitor.get_result());
+    }
+}
+
+// ----------------------------------------------------------------------------
+
+template<typename DF, typename T, typename V1, typename V2>
+static inline void
+_load_groupby_data_2_(const DF &source,
+                      DF &dest,
+                      T &triple,
+                      const V1 &input_v1,
+                      const V2 &input_v2,
+                      const std::vector<std::size_t> &sort_v,
+                      const char *col_name1,
+                      const char *col_name2) {
+
+    std::size_t         marker = 0;
+    auto                &dst_idx = dest.get_index();
+    const std::size_t   vec_size = std::min(input_v1.size(), input_v2.size());
+    const auto          &src_idx = source.get_index();
+
+    if (dst_idx.empty())  {
+        using ColValueType1 = typename V1::value_type;
+        using ColValueType2 = typename V2::value_type;
+
+        auto    *col_vec1 =
+            ::strcmp(col_name1, DF_INDEX_COL_NAME)
+                ? &(dest.template create_column<ColValueType1>(col_name1))
+                : nullptr;
+        auto    *col_vec2 =
+            ::strcmp(col_name2, DF_INDEX_COL_NAME)
+                ? &(dest.template create_column<ColValueType2>(col_name2))
+                : nullptr;
+
+        dst_idx.reserve(vec_size / 2 + 1);
+        if (col_vec1) col_vec1->reserve(vec_size / 2 + 1);
+        if (col_vec2) col_vec2->reserve(vec_size / 2 + 1);
+        for (std::size_t i = 0; i < vec_size; ++i)  {
+            if (input_v1[sort_v[i]] != input_v1[sort_v[marker]] ||
+                input_v2[sort_v[i]] != input_v2[sort_v[marker]])  {
+                dst_idx.push_back(src_idx[sort_v[i - 1]]);
+                if (col_vec1) col_vec1->push_back(input_v1[sort_v[i - 1]]);
+                if (col_vec2) col_vec2->push_back(input_v2[sort_v[i - 1]]);
+                marker = i;
+            }
+        }
+        if (marker < vec_size - 1)  {
+            dst_idx.push_back(src_idx[sort_v[vec_size - 1]]);
+            if (col_vec1) col_vec1->push_back(input_v1[sort_v[vec_size - 1]]);
+            if (col_vec2) col_vec2->push_back(input_v2[sort_v[vec_size - 1]]);
+        }
+    }
+
+    using ValueType = typename std::tuple_element<2, T>::type::value_type;
+
+    const auto          &src_vec =
+        source.template get_column<ValueType>(std::get<0>(triple));
+    const std::size_t   max_count = std::min(vec_size, src_vec.size());
+    auto                &dst_vec = _create_column_from_triple_(dest, triple);
+    auto                &visitor = std::get<2>(triple);
+
+    dst_vec.reserve(max_count / 2 + 1);
+    marker = 0;
+    for (std::size_t i = 0; i < max_count; ++i)  {
+        if (input_v1[sort_v[i]] != input_v1[sort_v[marker]] ||
+            input_v2[sort_v[i]] != input_v2[sort_v[marker]])  {
+            visitor.pre();
+            for (std::size_t j = marker; j < i; ++j)
+                visitor(src_idx[sort_v[j]], src_vec[sort_v[j]]);
+            visitor.post();
+            dst_vec.push_back(visitor.get_result());
+            marker = i;
+        }
+    }
+    if (marker < max_count)  {
+        visitor.pre();
+        for (std::size_t j = marker; j < max_count; ++j)
+            visitor(src_idx[sort_v[j]], src_vec[sort_v[j]]);
+        visitor.post();
+        dst_vec.push_back(visitor.get_result());
+    }
+}
+
+// ----------------------------------------------------------------------------
+
+template<typename DF, typename I, typename T>
+static inline void
+_load_bucket_data_(const DF &source, DF &dest, const I &interval, T &triple) {
+
+    std::size_t marker = 0;
+    auto        &dst_idx = dest.get_index();
+    const auto  &src_idx = source.get_index();
+
+    if (dst_idx.empty())  {
+        const std::size_t   idx_s = src_idx.size();
+
+        dst_idx.reserve(idx_s / interval + 1);
+        for (std::size_t i = 0; i < idx_s; ++i)  {
+            if (src_idx[i] - src_idx[marker] >= interval)  {
+                dst_idx.push_back(src_idx[i - 1]);
+                marker = i;
+            }
+        }
+    }
+
+    using ValueType = typename std::tuple_element<2, T>::type::value_type;
+
+    const auto          &src_vec =
+        source.template get_column<ValueType>(std::get<0>(triple));
+    auto                &dst_vec = _create_column_from_triple_(dest, triple);
+    const std::size_t   src_vec_size = src_vec.size();
+    auto                &visitor = std::get<2>(triple);
+
+    dst_vec.reserve(src_vec_size / interval + 1);
+    visitor.pre();
+    for (std::size_t i = 0, marker = 0; i < src_vec_size; ++i)  {
+        if (src_idx[i] - src_idx[marker] >= interval)  {
+            visitor.post();
+            dst_vec.push_back(visitor.get_result());
+            visitor.pre();
+            marker = i;
+        }
+        visitor(src_idx[i], src_vec[i]);
+    }
+}
+
+// ----------------------------------------------------------------------------
 
 template<typename T>
 static inline void

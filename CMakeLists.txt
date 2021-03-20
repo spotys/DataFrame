@@ -79,7 +79,6 @@ set(${LIBRARY_TARGET_NAME}_SRC
   src/Vectors/HeteroVector.cc
   src/Vectors/HeteroView.cc
   src/Vectors/HeteroPtrView.cc
-  src/Utils/ThreadGranularity.cc
   src/Utils/DateTime.cc
 )
 
@@ -97,13 +96,13 @@ set(${LIBRARY_TARGET_NAME}_HDR
   include/DataFrame/DataFrameMLVisitors.h
   include/DataFrame/DataFrameFinancialVisitors.h
   include/DataFrame/DataFrameTransformVisitors.h
-  include/DataFrame/GroupbyAggregators.h
   include/DataFrame/DataFrameTypes.h
   include/DataFrame/RandGen.h
   include/DataFrame/DataFrameOperators.h
   include/DataFrame/DataFrame.h
   include/DataFrame/Internals/DataFrame.tcc
   include/DataFrame/Internals/DataFrame_get.tcc
+  include/DataFrame/Internals/DataFrame_visit.tcc
   include/DataFrame/Internals/DataFrame_misc.tcc
   include/DataFrame/Internals/DataFrame_standalone.tcc
   include/DataFrame/Internals/DataFrame_opt.tcc
@@ -116,6 +115,7 @@ set(${LIBRARY_TARGET_NAME}_HDR
   include/DataFrame/Internals/RandGen.tcc
   include/DataFrame/Utils/ThreadGranularity.h
   include/DataFrame/Utils/DateTime.h
+  include/DataFrame/Utils/Utils.h
   include/DataFrame/Utils/FixedSizeString.h
   include/DataFrame/Utils/FixedSizePriorityQueue.h
 )
@@ -128,6 +128,7 @@ endif(UNIX)
 
 if (MSVC)
   add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+  add_definitions(-D_USE_MATH_DEFINES)
   add_library(${LIBRARY_TARGET_NAME} ${${LIBRARY_TARGET_NAME}_SRC})
 
   # If shared:

@@ -21,7 +21,6 @@ SRCS = Vectors/HeteroVector.cc \
        ../test/vector_ptr_view_tester.cc \
        ../test/date_time_tester.cc \
        ../test/gen_rand_tester.cc \
-       Utils/ThreadGranularity.cc \
        Utils/DateTime.cc
 
 HEADERS = $(LOCAL_INCLUDE_DIR)/DataFrame/Vectors/HeteroVector.h \
@@ -36,6 +35,7 @@ HEADERS = $(LOCAL_INCLUDE_DIR)/DataFrame/Vectors/HeteroVector.h \
           $(LOCAL_INCLUDE_DIR)/DataFrame/Internals/DataFrame_standalone.tcc \
           $(LOCAL_INCLUDE_DIR)/DataFrame/Internals/DataFrame_set.tcc \
           $(LOCAL_INCLUDE_DIR)/DataFrame/Internals/DataFrame_get.tcc \
+          $(LOCAL_INCLUDE_DIR)/DataFrame/Internals/DataFrame_visit.tcc \
           $(LOCAL_INCLUDE_DIR)/DataFrame/Internals/DataFrame_read.tcc \
           $(LOCAL_INCLUDE_DIR)/DataFrame/Internals/DataFrame_write.tcc \
           $(LOCAL_INCLUDE_DIR)/DataFrame/Internals/DataFrame_opt.tcc \
@@ -47,7 +47,6 @@ HEADERS = $(LOCAL_INCLUDE_DIR)/DataFrame/Vectors/HeteroVector.h \
           $(LOCAL_INCLUDE_DIR)/DataFrame/DataFrameMLVisitors.h \
           $(LOCAL_INCLUDE_DIR)/DataFrame/DataFrameFinancialVisitors.h \
           $(LOCAL_INCLUDE_DIR)/DataFrame/DataFrameTransformVisitors.h \
-          $(LOCAL_INCLUDE_DIR)/DataFrame/GroupbyAggregators.h \
           $(LOCAL_INCLUDE_DIR)/DataFrame/DataFrameTypes.h \
           $(LOCAL_INCLUDE_DIR)/DataFrame/RandGen.h \
           $(LOCAL_INCLUDE_DIR)/DataFrame/DataFrameOperators.h \
@@ -55,6 +54,7 @@ HEADERS = $(LOCAL_INCLUDE_DIR)/DataFrame/Vectors/HeteroVector.h \
           $(LOCAL_INCLUDE_DIR)/DataFrame/Vectors/VectorPtrView.h \
           $(LOCAL_INCLUDE_DIR)/DataFrame/Utils/ThreadGranularity.h \
           $(LOCAL_INCLUDE_DIR)/DataFrame/Utils/DateTime.h \
+          $(LOCAL_INCLUDE_DIR)/DataFrame/Utils/Utils.h \
           $(LOCAL_INCLUDE_DIR)/DataFrame/Utils/FixedSizeString.h \
           $(LOCAL_INCLUDE_DIR)/DataFrame/Utils/FixedSizePriorityQueue.h
 
@@ -87,7 +87,6 @@ DEFINES = -D_REENTRANT -DHMDF_HAVE_CLOCK_GETTIME \
 LIB_OBJS = $(LOCAL_OBJ_DIR)/HeteroVector.o \
            $(LOCAL_OBJ_DIR)/HeteroView.o \
            $(LOCAL_OBJ_DIR)/HeteroPtrView.o \
-           $(LOCAL_OBJ_DIR)/ThreadGranularity.o \
            $(LOCAL_OBJ_DIR)/DateTime.o
 
 # -----------------------------------------------------------------------------

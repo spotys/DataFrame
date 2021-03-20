@@ -30,7 +30,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <DataFrame/DataFrameMLVisitors.h>
 #include <DataFrame/DataFrameOperators.h>
 #include <DataFrame/DataFrameStatsVisitors.h>
-#include <DataFrame/GroupbyAggregators.h>
 #include <DataFrame/RandGen.h>
 
 #include <cassert>
@@ -125,21 +124,27 @@ static void test_haphazard()  {
 
     std::vector<int>    ivec = df.get_column<int> ("int_col");
 
-	std::cout << std::endl;
+    std::cout << std::endl;
     assert(df.get_column<int>("int_col") == df.get_column<int>(std::size_t(1)));
     assert(df.get_column<double> ("dbl_col")[2] == 3.2345);
 
     std::cout << "\nTesting Visitors 1 ..." << std::endl;
 
-    MeanVisitor<int>    ivisitor;
-    MeanVisitor<double> dvisitor;
-    const MyDataFrame   const_df = df;
-    auto                const_fut =
+    MeanVisitor<int>                ivisitor;
+    MeanVisitor<double>             dvisitor;
+    MeanVisitor<double>             rev_dvisitor;
+    WeightedMeanVisitor<double>     wm_dvisitor;
+    QuadraticMeanVisitor<double>    quad_dvisitor;
+    const MyDataFrame               const_df = df;
+    auto                            const_fut =
         const_df.visit_async<int>("int_col", ivisitor);
 
     assert(const_fut.get().get_result() == 1);
 
     auto    fut = df.visit_async<double>("dbl_col", dvisitor);
+    // auto    rev_fut = df.visit_async<double>("dbl_col", rev_dvisitor);
+    // auto    wm_fut = df.visit_async<double>("dbl_col", wm_dvisitor);
+    // auto    quad_fut = df.visit_async<double>("dbl_col", quad_dvisitor);
 
     assert(abs(fut.get().get_result() - 3.2345) < 0.00001);
 
@@ -148,6 +153,12 @@ static void test_haphazard()  {
     df.get_column<double>("dbl_col")[7] = 8.5;
     assert(::abs(df.visit<double>("dbl_col", dvisitor).get_result() -
                  4.83406) < 0.0001);
+    assert(::abs(df.visit<double>("dbl_col", rev_dvisitor, true).get_result() -
+                 4.83406) < 0.0001);
+    assert(::abs(df.visit<double>("dbl_col", wm_dvisitor).get_result() -
+                 6.05604) < 0.0001);
+    assert(::abs(df.visit<double>("dbl_col", quad_dvisitor).get_result() -
+                 5.39745) < 0.0001);
 
     std::vector<double> dvec = df.get_column<double> ("dbl_col");
     std::vector<double> dvec2 = df.get_column<double> ("dbl_col_2");
@@ -287,11 +298,17 @@ static void test_haphazard()  {
     std::cout << "\nTesting Correlation Visitor ..." << std::endl;
 
     CorrVisitor<double> corr_visitor;
+    CorrVisitor<double> rev_corr_visitor;
     auto                fut10 =
         df.visit_async<double, double>("dbl_col", "dbl_col_2", corr_visitor);
+    auto                rev_fut10 =
+        df.visit_async<double, double>("dbl_col", "dbl_col_2",
+                                       rev_corr_visitor, true);
     const double        corr = fut10.get().get_result();
+    const double        rev_corr = rev_fut10.get().get_result();
 
     assert(fabs(corr - -0.358381) < 0.000001);
+    assert(fabs(rev_corr - -0.358381) < 0.000001);
 
     std::cout << "\nTesting Stats Visitor ..." << std::endl;
 
@@ -361,57 +378,14 @@ static void test_haphazard()  {
               double,
               std::string>(std::cout);
 
-    const MyDataFrame   dfxx =
-        dfx.groupby<GroupbySum,
-                    unsigned long,
-                    int,
-                    unsigned long,
-                    std::string,
-                    double>(GroupbySum(), DF_INDEX_COL_NAME);
-
-    dfxx.write<std::ostream,
-               int,
-               unsigned long,
-               double,
-               std::string>(std::cout);
-
-    const MyDataFrame   dfxx2 =
-        dfx.groupby<GroupbySum,
-                    std::string,
-                    int,
-                    unsigned long,
-                    std::string,
-                    double>(GroupbySum(), "str_col");
-
-    dfxx2.write<std::ostream,
-                int,
-                unsigned long,
-                double,
-                std::string>(std::cout);
-
-    std::future<MyDataFrame>    gb_fut =
-        dfx.groupby_async<GroupbySum,
-                          double,
-                          int,
-                          unsigned long,
-                          std::string,
-                          double>(GroupbySum(), "dbl_col_2");
-    const MyDataFrame           dfxx3 = gb_fut.get();
-
-    dfxx3.write<std::ostream,
-                int,
-                unsigned long,
-                double,
-                std::string>(std::cout);
-
     std::cout << "\nTesting Async write ..." << std::endl;
 
     std::future<bool>   fut2 =
-        dfxx3.write_async<std::ostream,
-                          int,
-                          unsigned long,
-                          double,
-                          std::string>(std::cout);
+        dfx.write_async<std::ostream,
+                        int,
+                        unsigned long,
+                        double,
+                        std::string>(std::cout);
 
     fut2.get();
 
@@ -437,23 +411,6 @@ static void test_haphazard()  {
               unsigned long,
               double,
               std::string>(std::cout);
-
-    std::cout << "\nTesting Bucketize() ..." << std::endl;
-
-    const MyDataFrame::IndexType    interval = 4;
-    std::future<MyDataFrame>        b_fut =
-        dfx.bucketize_async<GroupbySum,
-                            int,
-                            unsigned long,
-                            std::string,
-                            double>(GroupbySum(), interval);
-    const MyDataFrame               buck_df = b_fut.get();
-
-    buck_df.write<std::ostream,
-                  int,
-                  unsigned long,
-                  double,
-                  std::string>(std::cout);
 
     std::cout << "\nTesting multi_visit() ..." << std::endl;
 
@@ -488,10 +445,6 @@ static void test_haphazard()  {
                                  unsigned long,
                                  double,
                                  std::string>(dfx)));
-    assert((! df_copy_con.is_equal<int,
-                                   unsigned long,
-                                   double,
-                                   std::string>(dfxx)));
 
     df_copy_con.get_column<double>("dbl_col")[7] = 88.888888;
     assert(dfx.get_column<double>("dbl_col")[7] == 10.0);
@@ -1200,7 +1153,7 @@ static void test_largest_smallest_visitors()  {
 
     NLargestVisitor<5, double> nl_visitor;
 
-    df.visit<double>("col_3", nl_visitor);
+    df.visit<double>("col_3", nl_visitor, true);
     std::cout << "N largest result for col_3:" << std::endl;
     for (auto iter : nl_visitor.get_result())
         std::cout << iter.index << '|' << iter.value << " ";
@@ -2184,6 +2137,17 @@ static void test_return()  {
     assert(fabs(result3[16] - 1.13882) < 0.00001);
     assert(fabs(result3[6] - -4.12333) < 0.00001);
     assert(fabs(result3[10] - -1.91172) < 0.00001);
+
+    ReturnVisitor<double>   return_visit4(return_policy::trinary);
+    const auto              &result4 =
+        df.single_act_visit<double>("col_1", return_visit4).get_result();
+
+    assert(result4.size() == 20);
+    assert(result4[0] == 1);
+    assert(result4[1] == -1);
+    assert(result4[16] == 1);
+    assert(result4[6] == -1);
+    assert(result4[10] == -1);
 }
 
 // -----------------------------------------------------------------------------
@@ -2218,7 +2182,7 @@ static void test_median()  {
 
     MedianVisitor<double>   med_visit;
     double                  result =
-        df.single_act_visit<double>("dblcol_1", med_visit).get_result();
+        df.single_act_visit<double>("dblcol_1", med_visit, true).get_result();
 
     assert(result == 10.0);
 
@@ -2282,7 +2246,7 @@ static void test_tracking_error()  {
 
     result = df.visit<double, double>("dblcol_1",
                                       "dblcol_3",
-                                      tracking_visit).get_result();
+                                      tracking_visit, true).get_result();
     assert(fabs(result - 0.256416) < 0.00001);
 
     result = df.visit<double, double>("dblcol_1",
@@ -3195,33 +3159,19 @@ static void test_ExponentialRollAdopter()  {
         MeanVisitor<double>(), 3, exponential_decay_spec::halflife, 0.5);
     const auto                                          &hl_expo_result =
         df.single_act_visit<double>("col_3", hl_expo_mean_roller).get_result();
+
+    assert(hl_expo_result.size() == 11);
+    assert(std::isnan(hl_expo_result[0]));
+    assert(std::isnan(hl_expo_result[1]));
+    assert(hl_expo_result[2] == 16.0);
+    assert(fabs(hl_expo_result[5] - 19.6562) < 0.0001);
+    assert(fabs(hl_expo_result[8] - 22.6665) < 0.0001);
+
     ExponentialRollAdopter<MeanVisitor<double>, double> cg_expo_mean_roller(
         MeanVisitor<double>(), 3, exponential_decay_spec::center_of_gravity,
         0.5);
     const auto                                          &cg_expo_result =
         df.single_act_visit<double>("col_3", cg_expo_mean_roller).get_result();
-    ExponentialRollAdopter<MeanVisitor<double>, double> s_expo_mean_roller(
-        MeanVisitor<double>(), 3, exponential_decay_spec::span, 1.5);
-    const auto                                          &s_expo_result =
-        df.single_act_visit<double>("col_3", s_expo_mean_roller).get_result();
-    ExponentialRollAdopter<MeanVisitor<double>, double> f_expo_mean_roller(
-        MeanVisitor<double>(), 3, exponential_decay_spec::fixed, 0.5);
-    const auto                                          &f_expo_result =
-        df.single_act_visit<double>("col_3", f_expo_mean_roller).get_result();
-
-    assert(s_expo_result.size() == 11);
-    assert(std::isnan(s_expo_result[0]));
-    assert(std::isnan(s_expo_result[1]));
-    assert(s_expo_result[2] == 16.0);
-    assert(s_expo_result[5] == 19.744);
-    assert(fabs(s_expo_result[8] - 22.75) < 0.0001);
-
-    assert(f_expo_result.size() == 11);
-    assert(std::isnan(f_expo_result[0]));
-    assert(std::isnan(f_expo_result[1]));
-    assert(f_expo_result[2] == 16.0);
-    assert(f_expo_result[5] == 19.0);
-    assert(f_expo_result[8] == 22.0);
 
     assert(cg_expo_result.size() == 11);
     assert(std::isnan(cg_expo_result[0]));
@@ -3230,12 +3180,41 @@ static void test_ExponentialRollAdopter()  {
     assert(fabs(cg_expo_result[5] - 19.4815) < 0.0001);
     assert(fabs(cg_expo_result[8] - 22.4993) < 0.0001);
 
-    assert(hl_expo_result.size() == 11);
-    assert(std::isnan(hl_expo_result[0]));
-    assert(std::isnan(hl_expo_result[1]));
-    assert(hl_expo_result[2] == 16.0);
-    assert(fabs(hl_expo_result[5] - 19.6562) < 0.0001);
-    assert(fabs(hl_expo_result[8] - 22.6665) < 0.0001);
+    ExponentialRollAdopter<MeanVisitor<double>, double> s_expo_mean_roller(
+        MeanVisitor<double>(), 3, exponential_decay_spec::span, 1.5);
+    const auto                                          &s_expo_result =
+        df.single_act_visit<double>("col_3", s_expo_mean_roller).get_result();
+
+    assert(s_expo_result.size() == 11);
+    assert(std::isnan(s_expo_result[0]));
+    assert(std::isnan(s_expo_result[1]));
+    assert(s_expo_result[2] == 16.0);
+    assert(s_expo_result[5] == 19.744);
+    assert(fabs(s_expo_result[8] - 22.75) < 0.0001);
+
+    ExponentialRollAdopter<MeanVisitor<double>, double> f_expo_mean_roller(
+        MeanVisitor<double>(), 3, exponential_decay_spec::fixed, 0.5);
+    const auto                                          &f_expo_result =
+        df.single_act_visit<double>("col_3", f_expo_mean_roller).get_result();
+
+    assert(f_expo_result.size() == 11);
+    assert(std::isnan(f_expo_result[0]));
+    assert(std::isnan(f_expo_result[1]));
+    assert(f_expo_result[2] == 16.0);
+    assert(f_expo_result[5] == 19.0);
+    assert(f_expo_result[8] == 22.0);
+
+    ExponentialRollAdopter<MeanVisitor<double>, double> expo_mean_roller_3(
+        MeanVisitor<double>(), 3, exponential_decay_spec::span, 3, 3);
+    const auto                                          &expo_result_3 =
+        df.single_act_visit<double>("col_3", expo_mean_roller_3).get_result();
+
+    assert(expo_result_3.size() == 11);
+    assert(std::isnan(expo_result_3[0]));
+    assert(std::isnan(expo_result_3[1]));
+    assert(expo_result_3[2] == 16.0);
+    assert(std::fabs(expo_result_3[5] - 18.125) < 0.0001);
+    assert(std::fabs(expo_result_3[8] - 21.0156) < 0.0001);
 }
 
 // -----------------------------------------------------------------------------
@@ -3877,11 +3856,12 @@ static void test_view_visitors()  {
     assert(fabs(dfv.visit<double, double>("dbl_col1", "dbl_col2",
                                  dp_visitor).get_result() - 45.98) < 0.00001);
 
-
     SimpleRollAdopter<MeanVisitor<double>, double>
         mean_roller1(MeanVisitor<double>(), 3);
     const auto &res_sra =
-        dfv.single_act_visit<double>("dbl_col1", mean_roller1).get_result();
+        dfv.single_act_visit<double>("dbl_col1",
+                                     mean_roller1,
+                                     true).get_result();
 
     assert(fabs(res_sra[2] - 3.3) < 0.00001);
 
@@ -4544,26 +4524,26 @@ static void test_MACDVisitor()  {
 
     assert(macd_result.size() == 40);
     assert(std::isnan(macd_result[3]));
-    assert(fabs(macd_result[8] - 0.526749) < 0.000001);
-    assert(fabs(macd_result[12] - 0.104049) < 0.000001);
-    assert(fabs(macd_result[38] - 2.74705e-06) < 0.000001);
-    assert(fabs(macd_result[39] - -1.83136e-06) < 0.000001);
+    assert(fabs(macd_result[8] - 1.5) < 0.000001);
+    assert(fabs(macd_result[12] - 1.5) < 0.000001);
+    assert(fabs(macd_result[38] - -0.777175) < 0.000001);
+    assert(fabs(macd_result[39] - -1.12938) < 0.00001);
 
     assert(signal_line.size() == 40);
     assert(std::isnan(signal_line[2]));
     assert(std::isnan(signal_line[4]));
-    assert(fabs(signal_line[8] - 2.50206) < 0.00001);
-    assert(fabs(signal_line[12] - 1.18789) < 0.00001);
-    assert(fabs(signal_line[38] - 0.000150401) < 0.000001);
-    assert(fabs(signal_line[39] - -0.000103319) < 0.000001);
+    assert(fabs(signal_line[8] - 1.5) < 0.00001);
+    assert(fabs(signal_line[12] - 1.5) < 0.00001);
+    assert(fabs(signal_line[38] - -1.08524) < 0.00001);
+    assert(fabs(signal_line[39] - -1.09785) < 0.00001);
 
     assert(macd_histo.size() == 40);
     assert(std::isnan(macd_histo[0]));
     assert(std::isnan(macd_histo[4]));
-    assert(fabs(macd_histo[8] - -1.97531) < 0.00001);
-    assert(fabs(macd_histo[12] - -1.08385) < 0.00001);
-    assert(fabs(macd_histo[38] - -0.000147654) < 0.000001);
-    assert(fabs(macd_histo[39] - 0.000101488) < 0.000001);
+    assert(fabs(macd_histo[8] - 0) < 0.00001);
+    assert(fabs(macd_histo[12] - 0) < 0.00001);
+    assert(fabs(macd_histo[38] - 0.308069) < 0.000001);
+    assert(fabs(macd_histo[39] - -0.0315231) < 0.000001);
 }
 
 // -----------------------------------------------------------------------------

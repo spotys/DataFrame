@@ -33,6 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <DataFrame/Utils/DateTime.h>
 #include <DataFrame/Utils/FixedSizeString.h>
 #include <DataFrame/Utils/ThreadGranularity.h>
+#include <DataFrame/Utils/Utils.h>
 
 #include <array>
 #include <fstream>
@@ -47,15 +48,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace hmdf
 {
 
-// I: Index (e.g. Timestamp) type. Although an index column need not necessarily
-//    represent time, it could be any built-in or user-defined type.
+// I: Index (e.g. Timestamp) type. Although an index column need not
+//    necessarily represent time, it could be any built-in or user-defined type
 // H: See the static assert below. It can only be either
 //    a HeteroVector (typedef'ed below to StdDataFrame) or
 //    a HeteroView (typedef'ed below to DataFrameView) or
 //    a HeteroPtrView (typedef'ed below to DataFramePtrView)
 //
 // A DataFrame may contain one index and any number of columns of any built-in
-// or user-defined types.
+// or user-defined types
 //
 template<typename I, typename H>
 class LIBRARY_API DataFrame : public ThreadGranularity {
@@ -89,7 +90,7 @@ public:
     DataFrame &operator= (const DataFrame &) = default;
     DataFrame &operator= (DataFrame &&) = default;
 
-    // Because of thread safety, this needs tender loving care 
+    // Because of thread safety, this needs tender loving care
     //
     ~DataFrame();
 
@@ -291,7 +292,7 @@ public:  // Load/append/remove interfaces
         std::vector<T> &&data,
         size_type interval,
         bool start_from_beginning,
-        const T &null_value = DataFrame::_get_nan<T>(),
+        const T &null_value = hmdf::get_nan<T>(),
         std::function<typename DataFrame<I, H>::size_type (
             const typename DataFrame<I, H>::IndexType &,
             const typename DataFrame<I, H>::IndexType &)> diff_func =
@@ -946,57 +947,70 @@ public:  // Data manipulation
                const char *name4, sort_spec dir4,
                const char *name5, sort_spec dir5);
 
-    // Groupby copies the DataFrame into a temp DataFrame and sorts
-    // the temp df by gb_col_name before performing groupby.
-    // If gb_col_name is DF_INDEX_COL_NAME, it groups by index.
+    // This method groups the DataFrame by the named column of type T.
+    // The group-by’ing is done by equality.
+    // The comparison and equality operators must be well defined for type T.
+    // It returns a new DataFrame that has been group-by’ed.
+    // The summarization of columns is specified by a list of 3-member-tuples
+    // (triples) of the following format:
+    //    1. Current DataFrame column name
+    //    2. Column name for the new bucketized DataFrame
+    //    3. A visitor to aggregate current column to new column
     //
-    // F:
-    //   type functor to be applied to columns to group by
+    // The index column is never summarized in the returned DataFrame. If the
+    // named column is not the index column, than the index of the returned
+    // DataFrame is the last index items of the original DataFrame for the
+    // named column.
+    // If the named column is other than index column, then the returned
+    // DataFrame also has a column with the same name which has the unique
+    // values of the named column.
+    // Also see bucketize().
+    //
     // T:
-    //   type of the groupby column. In case if index, it is type of index
+    //   Type of groupby column. In case if index, it is type of index
     // Ts:
-    //   List all the types of all data columns. A type should be specified in
-    //   the list only once.
-    // func:
-    //   The aggregator functor to do the groupby. All built-in groupby
-    //   aggregators are defined in GroupbyAggregators.h file
-    // gb_col_name:
-    //   Name of the column
-    // already_sorted:
-    //   If the DataFrame is already sorted by gb_col_name, this will save the
-    //   expensive sort operation
+    //   Types of triples to specify the column summarization
+    // col_name:
+    //   Name of the grouop-by'ing column
+    // args:
+    //   List of triples to specify the column summarization
     //
-    template<typename F, typename T, typename ... Ts>
+    template<typename T, typename ... Ts>
     [[nodiscard]] DataFrame
-    groupby(F &&func,
-            const char *gb_col_name,
-            sort_state already_sorted = sort_state::not_sorted) const;
+    groupby1(const char *col_name, Ts&& ... args) const;
 
-    // This is the same as above groupby() but it groups by two columns
+    // This is the same as above groupby1() but it groups by two columns
     //
-    template<typename F, typename T1, typename T2, typename ... Ts>
+    // T1:
+    //   Type of first groupby column. In case if index, it is type of index
+    // T2:
+    //   Type of second groupby column. In case if index, it is type of index
+    // Ts:
+    //   Types of triples to specify the column summarization
+    // col_name1:
+    //   Name of the first grouop-by'ing column
+    // col_name2:
+    //   Name of the second grouop-by'ing column
+    // args:
+    //   List of triples to specify the column summarization
+    //
+    template<typename T1, typename T2, typename ... Ts>
     [[nodiscard]] DataFrame
-    groupby(F &&func,
-            const char *gb_col_name1,
-            const char *gb_col_name2,
-            sort_state already_sorted = sort_state::not_sorted) const;
+    groupby2(const char *col_name1, const char *col_name2, Ts&& ... args) const;
 
-    // Same as groupby() above, but executed asynchronously
+    // Same as groupby1() above, but executed asynchronously
     //
-    template<typename F, typename T, typename ... Ts>
+    template<typename T, typename ... Ts>
     [[nodiscard]] std::future<DataFrame>
-    groupby_async(F &&func,
-                  const char *gb_col_name,
-                  sort_state already_sorted = sort_state::not_sorted) const;
+    groupby1_async(const char *col_name, Ts&& ... args) const;
 
-    // Same as groupby() above, but executed asynchronously
+    // Same as groupby2() above, but executed asynchronously
     //
-    template<typename F, typename T1, typename T2, typename ... Ts>
+    template<typename T1, typename T2, typename ... Ts>
     [[nodiscard]] std::future<DataFrame>
-    groupby_async(F &&func,
-                  const char *gb_col_name1,
-                  const char *gb_col_name2,
-                  sort_state already_sorted = sort_state::not_sorted) const;
+    groupby2_async(const char *col_name1,
+                   const char *col_name2,
+                   Ts&& ... args) const;
 
     // It counts the unique values in the named column.
     // It returns a StdDataFrame of following specs:
@@ -1029,52 +1043,39 @@ public:  // Data manipulation
     }
 
     // It bucketizes the data and index into bucket_interval's,
-    // based on index values and calls the functor for each bucket.
-    // The result of each bucket will be stored in a new DataFrame with
-    // same shape and returned.
+    // based on index values.
+    // You must specify how each column is bucketized by providing 3-member
+    // tuples (triples). Each triple has the format:
+    //    1. Current DataFrame column name
+    //    2. Column name for the new bucketized DataFrame
+    //    3. A visitor to aggregate/bucketize current column to new column
+    //
+    // The result of each bucket will be stored in a new DataFrame and returned.
     // Every data bucket is guaranteed to be as wide as bucket_interval.
-    // This mean some data items at the end may not be included in the
+    // This means some data items at the end may not be included in the
     // new bucketized DataFrame.
     // The index of each bucket will be the last index in the original
     // DataFrame that is less than bucket_interval away from the
     // previous bucket
     //
-    // NOTE:The DataFrame must already be sorted by index.
+    // NOTE: The DataFrame must already be sorted by index.
     //
-    // F:
-    //   Functor type to be applied to columns to bucketize
-    // Ts:
-    //   List all the types of all data columns. A type should be specified in
-    //   the list only once.
-    // func:
-    //   The functor to do summarization and bucktization.
-    //   All built-in bucket aggregators are defined in
-    //   GroupbyAggregators.h file
     // bucket_interval:
     //   Bucket interval is in the index's single value unit. For example if
     //   index is in minutes, bucket_interval will be in the unit of minutes
     //   and so on.
+    // args:
+    //   Variable argument list of triples as specified above
     //
-    template<typename F, typename ... Ts>
+    template<typename ... Ts>
     [[nodiscard]] DataFrame
-    bucketize(F &&func, const IndexType &bucket_interval) const;
+    bucketize(const IndexType &bucket_interval, Ts&& ... args) const;
 
     // Same as bucketize() above, but executed asynchronously
     //
-    template<typename F, typename ... Ts>
+    template<typename ... Ts>
     [[nodiscard]] std::future<DataFrame>
-    bucketize_async(F &&func, const IndexType &bucket_interval) const;
-
-    // This is exactly the same as bucketize() above. The only difference is
-    // it stores the result in itself and returns void.
-    // So after the return the original data is lost and replaced with
-    // bucketized data
-    //
-    // NOTE:The DataFrame must already be sorted by index.
-    //
-    template<typename F, typename ... Ts>
-    void
-    self_bucketize(F &&func, const IndexType &bucket_interval);
+    bucketize_async(const IndexType &bucket_interval, Ts&& ... args) const;
 
     // It transposes the data in the DataFrame.
     // The transpose() is only defined for DataFrame's that have a single
@@ -1211,8 +1212,9 @@ public:  // Data manipulation
     //   List all the types of all data columns. A type should be specified in
     //   the list only once.
     // periods:
-    //   Number of periods to shift shift_policy: Specifies the direction
-    //   (i.e. up/down, left/right) to shift
+    //   Number of periods to shift
+    // shift_policy:
+    //   Specifies the direction (i.e. up/down, left/right) to shift
     //
     template<typename ... Ts>
     void
@@ -1224,6 +1226,24 @@ public:  // Data manipulation
     template<typename ... Ts>
     [[nodiscard]] StdDataFrame<IndexType>
     shift(size_type periods, shift_policy sp) const;
+
+    // This copies the named column into another vector and shifts it up or down
+    // and returns it.
+    // It is handy to create columns of shifted data in the dataframe for
+    // machine-learning analysis
+    //
+    // T:
+    //   Type of the col_name column.
+    // col_name:
+    //   Name of the column
+    // periods:
+    //   Number of periods to shift
+    // shift_policy:
+    //   Specifies the direction. In this case it is only up or down.
+    //
+    template<typename T>
+    [[nodiscard]] std::vector<T>
+    shift(const char *col_name, size_type periods, shift_policy sp) const;
 
     // It rotates all the columns in self up, down, left, or right based on
     // shift_policy.
@@ -2000,6 +2020,124 @@ public: // Read/access and slicing interfaces
                 F &functor,
                 bool delete_old_cols = true);
 
+    // This is the same as above consolidate(), but it consolidates 4 columns
+    // into one.
+    // Functor signature is:
+    //     template<typename ITR1, typename ITR2, typename ITR3,
+    //              typename ITR4>
+    //     std::vector<NEW_T> (IndexVecType::const_iterator idx_begin,
+    //                         IndexVecType::const_iterator idx_end,
+    //                         ITR1 col1_begin, ITR1 col1_end,
+    //                         ITR2 col2_begin, ITR2 col2_end,
+    //                         ITR3 col3_begin, ITR3 col3_end,
+    //                         ITR4 col4_begin, ITR4 col4_end);
+    //     Where ITR[1234] are iterators for columns 1, 2, 3, and 4. They are
+    //     iterators of std::vector.
+    //
+    // NOTE: This method could not be called from views.
+    //
+    // OLD_T1:
+    //   Type of existing column named old_col_name1
+    // OLD_T2:
+    //   Type of existing column named old_col_name2
+    // OLD_T3:
+    //   Type of existing column named old_col_name3
+    // OLD_T4:
+    //   Type of existing column named old_col_name4
+    // NEW_T:
+    //   Type of the new column new_col_name which is the consolidation of the
+    //   two existing columns
+    // F:
+    //   Type of the consildating functor
+    // old_col_name1:
+    //   Name of the first existing column
+    // old_col_name2:
+    //   Name of the second existing column
+    // old_col_name3:
+    //   Name of the third existing column
+    // old_col_name4:
+    //   Name of the forth existing column
+    // new_col_name:
+    //   Name of the new consolidated column
+    // functor:
+    //   Consolidating functor
+    // delete_old_cols:
+    //   If true, old columns will be removed
+    //
+    template<typename OLD_T1, typename OLD_T2, typename OLD_T3,
+             typename OLD_T4,
+             typename NEW_T, typename F>
+    void
+    consolidate(const char *old_col_name1,
+                const char *old_col_name2,
+                const char *old_col_name3,
+                const char *old_col_name4,
+                const char *new_col_name,
+                F &functor,
+                bool delete_old_cols = true);
+
+    // This is the same as above consolidate(), but it consolidates 5 columns
+    // into one.
+    // Functor signature is:
+    //     template<typename ITR1, typename ITR2, typename ITR3,
+    //              typename ITR4, typename ITR5>
+    //     std::vector<NEW_T> (IndexVecType::const_iterator idx_begin,
+    //                         IndexVecType::const_iterator idx_end,
+    //                         ITR1 col1_begin, ITR1 col1_end,
+    //                         ITR2 col2_begin, ITR2 col2_end,
+    //                         ITR3 col3_begin, ITR3 col3_end,
+    //                         ITR4 col4_begin, ITR4 col4_end,
+    //                         ITR5 col5_begin, ITR5 col5_end);
+    //     Where ITR[12345] are iterators for columns 1, 2, 3, 4, and 5.
+    //     They are iterators of std::vector.
+    //
+    // NOTE: This method could not be called from views.
+    //
+    // OLD_T1:
+    //   Type of existing column named old_col_name1
+    // OLD_T2:
+    //   Type of existing column named old_col_name2
+    // OLD_T3:
+    //   Type of existing column named old_col_name3
+    // OLD_T4:
+    //   Type of existing column named old_col_name4
+    // OLD_T5:
+    //   Type of existing column named old_col_name5
+    // NEW_T:
+    //   Type of the new column new_col_name which is the consolidation of the
+    //   two existing columns
+    // F:
+    //   Type of the consildating functor
+    // old_col_name1:
+    //   Name of the first existing column
+    // old_col_name2:
+    //   Name of the second existing column
+    // old_col_name3:
+    //   Name of the third existing column
+    // old_col_name4:
+    //   Name of the forth existing column
+    // old_col_name5:
+    //   Name of the fifth existing column
+    // new_col_name:
+    //   Name of the new consolidated column
+    // functor:
+    //   Consolidating functor
+    // delete_old_cols:
+    //   If true, old columns will be removed
+    //
+    template<typename OLD_T1, typename OLD_T2, typename OLD_T3,
+             typename OLD_T4, typename OLD_T5,
+             typename NEW_T, typename F>
+    void
+    consolidate(const char *old_col_name1,
+                const char *old_col_name2,
+                const char *old_col_name3,
+                const char *old_col_name4,
+                const char *old_col_name5,
+                const char *new_col_name,
+                F &functor,
+                bool delete_old_cols = true);
+
 public:  // Visitors
 
     // This is the most generalized visit function. It visits multiple
@@ -2048,16 +2186,21 @@ public:  // Visitors
     //   Type of the visitor functor
     // name:
     //   Name of the data column
+    // visitor:
+    //   An instance of the visitor
+    // in_reverse:
+    //   If true, it will iterate over the column in reverse order
     //
     template<typename T, typename V>
     V &
-    visit(const char *name, V &visitor);
+    visit(const char *name, V &visitor, bool in_reverse = false);
 
     template<typename T, typename V>
     V &
-    visit(const char *name, V &visitor) const  {
+    visit(const char *name, V &visitor, bool in_reverse = false) const  {
 
-        return(const_cast<DataFrame *>(this)->visit<T, V>(name, visitor));
+        return (const_cast<DataFrame *>(this)->visit<T, V>
+                (name, visitor, in_reverse));
     }
 
     // These are identical to above visit() but could execute asynchronously.
@@ -2069,11 +2212,11 @@ public:  // Visitors
     //
     template<typename T, typename V>
     [[nodiscard]] std::future<V &>
-    visit_async(const char *name, V &visitor);
+    visit_async(const char *name, V &visitor, bool in_reverse = false);
 
     template<typename T, typename V>
     [[nodiscard]] std::future<V &>
-    visit_async(const char *name, V &visitor) const;
+    visit_async(const char *name, V &visitor, bool in_reverse = false) const;
 
     // It passes the values of each index and the two named columns to the
     // functor visitor sequentially from beginning to end
@@ -2090,17 +2233,23 @@ public:  // Visitors
     //   Name of the first data column
     // name2:
     //   Name of the second data column
+    // visitor:
+    //   An instance of the visitor
+    // in_reverse:
+    //   If true, it will iterate over columns in reverse order
     //
     template<typename T1, typename T2, typename V>
     V &
-    visit(const char *name1, const char *name2, V &visitor);
+    visit(const char *name1, const char *name2, V &visitor,
+          bool in_reverse = false);
 
     template<typename T1, typename T2, typename V>
     V &
-    visit(const char *name1, const char *name2, V &visitor) const  {
+    visit(const char *name1, const char *name2, V &visitor,
+          bool in_reverse = false) const  {
 
         return (const_cast<DataFrame *>(this)->visit<T1, T2, V>
-                (name1, name2, visitor));
+                (name1, name2, visitor, in_reverse));
     }
 
     // These are identical to above visit() but could execute asynchronously.
@@ -2112,11 +2261,13 @@ public:  // Visitors
     //
     template<typename T1, typename T2, typename V>
     [[nodiscard]] std::future<V &>
-    visit_async(const char *name1, const char *name2, V &visitor);
+    visit_async(const char *name1, const char *name2, V &visitor,
+                bool in_reverse = false);
 
     template<typename T1, typename T2, typename V>
     [[nodiscard]] std::future<V &>
-    visit_async(const char *name1, const char *name2, V &visitor) const;
+    visit_async(const char *name1, const char *name2, V &visitor,
+                bool in_reverse = false) const;
 
     // It passes the values of each index and the three named columns to the
     // functor visitor sequentially from beginning to end
@@ -2137,20 +2288,26 @@ public:  // Visitors
     //   Name of the second data column
     // name3:
     //   Name of the third data column
+    // visitor:
+    //   An instance of the visitor
+    // in_reverse:
+    //   If true, it will iterate over columns in reverse order
     //
     template<typename T1, typename T2, typename T3, typename V>
     V &
-    visit(const char *name1, const char *name2, const char *name3, V &visitor);
+    visit(const char *name1, const char *name2, const char *name3, V &visitor,
+          bool in_reverse = false);
 
     template<typename T1, typename T2, typename T3, typename V>
     V &
     visit(const char *name1,
           const char *name2,
           const char *name3,
-          V &visitor) const  {
+          V &visitor,
+          bool in_reverse = false) const  {
 
         return (const_cast<DataFrame *>(this)->visit<T1, T2, T3, V>
-                (name1, name2, name3, visitor));
+                (name1, name2, name3, visitor, in_reverse));
     }
 
     // These are identical to above visit() but could execute asynchronously.
@@ -2165,14 +2322,16 @@ public:  // Visitors
     visit_async(const char *name1,
                 const char *name2,
                 const char *name3,
-                V &visitor);
+                V &visitor,
+                bool in_reverse = false);
 
     template<typename T1, typename T2, typename T3, typename V>
     [[nodiscard]] std::future<V &>
     visit_async(const char *name1,
                 const char *name2,
                 const char *name3,
-                V &visitor) const;
+                V &visitor,
+                bool in_reverse = false) const;
 
     // It passes the values of each index and the four named columns to the
     // functor visitor sequentially from beginning to end
@@ -2197,6 +2356,10 @@ public:  // Visitors
     //   Name of the third data column
     // name4:
     //   Name of the fourth data column
+    // visitor:
+    //   An instance of the visitor
+    // in_reverse:
+    //   If true, it will iterate over columns in reverse order
     //
     template<typename T1, typename T2, typename T3, typename T4, typename V>
     V &
@@ -2204,7 +2367,8 @@ public:  // Visitors
           const char *name2,
           const char *name3,
           const char *name4,
-          V &visitor);
+          V &visitor,
+          bool in_reverse = false);
 
     template<typename T1, typename T2, typename T3, typename T4, typename V>
     V &
@@ -2212,10 +2376,11 @@ public:  // Visitors
           const char *name2,
           const char *name3,
           const char *name4,
-          V &visitor) const  {
+          V &visitor,
+          bool in_reverse = false) const  {
 
         return (const_cast<DataFrame *>(this)->visit<T1, T2, T3, T4, V>
-                (name1, name2, name3, name4, visitor));
+                (name1, name2, name3, name4, visitor, in_reverse));
     }
 
     // These are identical to above visit() but could execute asynchronously.
@@ -2231,7 +2396,8 @@ public:  // Visitors
                 const char *name2,
                 const char *name3,
                 const char *name4,
-                V &visitor);
+                V &visitor,
+                bool in_reverse = false);
 
     template<typename T1, typename T2, typename T3, typename T4, typename V>
     [[nodiscard]] std::future<V &>
@@ -2239,7 +2405,8 @@ public:  // Visitors
                 const char *name2,
                 const char *name3,
                 const char *name4,
-                V &visitor) const;
+                V &visitor,
+                bool in_reverse = false) const;
 
     // It passes the values of each index and the five named columns to the
     // functor visitor sequentially from beginning to end
@@ -2268,6 +2435,10 @@ public:  // Visitors
     //   Name of the fourth data column
     // name5:
     //   Name of the fifth data column
+    // visitor:
+    //   An instance of the visitor
+    // in_reverse:
+    //   If true, it will iterate over columns in reverse order
     //
     template<typename T1, typename T2, typename T3, typename T4, typename T5,
              typename V>
@@ -2277,7 +2448,8 @@ public:  // Visitors
           const char *name3,
           const char *name4,
           const char *name5,
-          V &visitor);
+          V &visitor,
+          bool in_reverse = false);
 
     template<typename T1, typename T2, typename T3, typename T4, typename T5,
              typename V>
@@ -2287,10 +2459,11 @@ public:  // Visitors
           const char *name3,
           const char *name4,
           const char *name5,
-          V &visitor) const  {
+          V &visitor,
+          bool in_reverse = false) const  {
 
         return (const_cast<DataFrame *>(this)->visit<T1, T2, T3, T4, T5, V>
-                (name1, name2, name3, name4, name5, visitor));
+                (name1, name2, name3, name4, name5, visitor, in_reverse));
     }
 
     // These are identical to above visit() but could execute asynchronously.
@@ -2308,7 +2481,8 @@ public:  // Visitors
                 const char *name3,
                 const char *name4,
                 const char *name5,
-                V &visitor);
+                V &visitor,
+                bool in_reverse = false);
 
     template<typename T1, typename T2, typename T3, typename T4, typename T5,
              typename V>
@@ -2318,7 +2492,8 @@ public:  // Visitors
                 const char *name3,
                 const char *name4,
                 const char *name5,
-                V &visitor) const;
+                V &visitor,
+                bool in_reverse = false) const;
 
     // This is similar to visit(), but it passes a const reference to the index
     // vector and the named column vector at once the functor visitor.
@@ -2331,17 +2506,23 @@ public:  // Visitors
     //   Type of the visitor functor
     // name:
     //   Name of the data column
+    // visitor:
+    //   An instance of the visitor
+    // in_reverse:
+    //   If true, it will iterate over the column in reverse order
     //
     template<typename T, typename V>
     V &
-    single_act_visit(const char *name, V &visitor);
+    single_act_visit(const char *name, V &visitor, bool in_reverse = false);
 
     template<typename T, typename V>
     V &
-    single_act_visit(const char *name, V &visitor) const  {
+    single_act_visit(const char *name,
+                     V &visitor,
+                     bool in_reverse = false) const  {
 
         return (const_cast<DataFrame *>(this)->single_act_visit<T, V>
-                (name, visitor));
+                (name, visitor, in_reverse));
     }
 
     // These are identical to above single_act_visit() but could execute
@@ -2354,11 +2535,15 @@ public:  // Visitors
     //
     template<typename T1, typename V>
     [[nodiscard]] std::future<V &>
-    single_act_visit_async(const char *name, V &visitor);
+    single_act_visit_async(const char *name,
+                           V &visitor,
+                           bool in_reverse = false);
 
     template<typename T1, typename V>
     [[nodiscard]] std::future<V &>
-    single_act_visit_async(const char *name, V &visitor) const;
+    single_act_visit_async(const char *name,
+                           V &visitor,
+                           bool in_reverse = false) const;
 
     // This is similar to visit(), but it passes a const reference to the index
     // vector and the two named column vectors at once the functor visitor.
@@ -2376,17 +2561,27 @@ public:  // Visitors
     //   Name of the first data column
     // name2:
     //   Name of the second data column
+    // visitor:
+    //   An instance of the visitor
+    // in_reverse:
+    //   If true, it will iterate over columns in reverse order
     //
     template<typename T1, typename T2, typename V>
     V &
-    single_act_visit(const char *name1, const char *name2, V &visitor);
+    single_act_visit(const char *name1,
+                     const char *name2,
+                     V &visitor,
+                     bool in_reverse = false);
 
     template<typename T1, typename T2, typename V>
     V &
-    single_act_visit(const char *name1, const char *name2, V &visitor) const  {
+    single_act_visit(const char *name1,
+                     const char *name2,
+                     V &visitor,
+                     bool in_reverse = false) const  {
 
         return (const_cast<DataFrame *>(this)->single_act_visit<T1, T2, V>
-                (name1, name2, visitor));
+                (name1, name2, visitor, in_reverse));
     }
 
     // These are identical to above single_act_visit() but could execute
@@ -2399,13 +2594,164 @@ public:  // Visitors
     //
     template<typename T1, typename T2, typename V>
     [[nodiscard]] std::future<V &>
-    single_act_visit_async(const char *name1, const char *name2, V &visitor);
+    single_act_visit_async(const char *name1,
+                           const char *name2,
+                           V &visitor,
+                           bool in_reverse = false);
 
     template<typename T1, typename T2, typename V>
     [[nodiscard]] std::future<V &>
     single_act_visit_async(const char *name1,
                            const char *name2,
-                           V &visitor) const;
+                           V &visitor,
+                           bool in_reverse = false) const;
+
+    // This is similar to visit(), but it passes a const reference to the index
+    // vector and the 3 named column vectors at once to the functor visitor.
+    // This is convenient for calculations that need the whole data vector.
+    //
+    // NOTE: This method could be used to implement a pivot table.
+    //
+    // T1:
+    //   Type of the first named column
+    // T2:
+    //   Type of the second named column
+    // T3:
+    //   Type of the third named column
+    // V:
+    //   Type of the visitor functor
+    // name1:
+    //   Name of the first data column
+    // name2:
+    //   Name of the second data column
+    // name3:
+    //   Name of the third data column
+    // visitor:
+    //   An instance of the visitor
+    // in_reverse:
+    //   If true, it will iterate over columns in reverse order
+    //
+    template<typename T1, typename T2, typename T3, typename V>
+    V &
+    single_act_visit(const char *name1,
+                     const char *name2,
+                     const char *name3,
+                     V &visitor,
+                     bool in_reverse = false);
+
+    template<typename T1, typename T2, typename T3, typename V>
+    V &
+    single_act_visit(const char *name1,
+                     const char *name2,
+                     const char *name3,
+                     V &visitor,
+                     bool in_reverse = false) const  {
+
+        return (const_cast<DataFrame *>(this)->single_act_visit<T1, T2, T3, V>
+                (name1, name2, name3, visitor, in_reverse));
+    }
+
+    // These are identical to above single_act_visit() but could execute
+    // asynchronously.
+    // NOTE: It should be safe to run multiple single_act_visit on different
+    //       columns at the same time (as long as the index column is not being
+    //       modified).
+    // NOTE: It should be safe to run multiple read-only single_act_visit on
+    //       the same column or different columns at the same time
+    //
+    template<typename T1, typename T2, typename T3, typename V>
+    [[nodiscard]] std::future<V &>
+    single_act_visit_async(const char *name1,
+                           const char *name2,
+                           const char *name3,
+                           V &visitor,
+                           bool in_reverse = false);
+
+    template<typename T1, typename T2, typename T3, typename V>
+    [[nodiscard]] std::future<V &>
+    single_act_visit_async(const char *name1,
+                           const char *name2,
+                           const char *name3,
+                           V &visitor,
+                           bool in_reverse = false) const;
+
+    // This is similar to visit(), but it passes a const reference to the index
+    // vector and the 4 named column vectors at once to the functor visitor.
+    // This is convenient for calculations that need the whole data vector.
+    //
+    // NOTE: This method could be used to implement a pivot table.
+    //
+    // T1:
+    //   Type of the first named column
+    // T2:
+    //   Type of the second named column
+    // T3:
+    //   Type of the third named column
+    // T4:
+    //   Type of the fourth named column
+    // V:
+    //   Type of the visitor functor
+    // name1:
+    //   Name of the first data column
+    // name2:
+    //   Name of the second data column
+    // name3:
+    //   Name of the third data column
+    // name4:
+    //   Name of the fourth data column
+    // visitor:
+    //   An instance of the visitor
+    // in_reverse:
+    //   If true, it will iterate over columns in reverse order
+    //
+    template<typename T1, typename T2, typename T3, typename T4, typename V>
+    V &
+    single_act_visit(const char *name1,
+                     const char *name2,
+                     const char *name3,
+                     const char *name4,
+                     V &visitor,
+                     bool in_reverse = false);
+
+    template<typename T1, typename T2, typename T3, typename T4, typename V>
+    V &
+    single_act_visit(const char *name1,
+                     const char *name2,
+                     const char *name3,
+                     const char *name4,
+                     V &visitor,
+                     bool in_reverse = false) const  {
+
+        return (
+            const_cast<DataFrame *>(this)->single_act_visit<T1, T2, T3, T4, V>
+                (name1, name2, name3, name4, visitor, in_reverse));
+    }
+
+    // These are identical to above single_act_visit() but could execute
+    // asynchronously.
+    // NOTE: It should be safe to run multiple single_act_visit on different
+    //       columns at the same time (as long as the index column is not being
+    //       modified).
+    // NOTE: It should be safe to run multiple read-only single_act_visit on
+    //       the same column or different columns at the same time
+    //
+    template<typename T1, typename T2, typename T3, typename T4, typename V>
+    [[nodiscard]] std::future<V &>
+    single_act_visit_async(const char *name1,
+                           const char *name2,
+                           const char *name3,
+                           const char *name4,
+                           V &visitor,
+                           bool in_reverse = false);
+
+    template<typename T1, typename T2, typename T3, typename T4, typename V>
+    [[nodiscard]] std::future<V &>
+    single_act_visit_async(const char *name1,
+                           const char *name2,
+                           const char *name3,
+                           const char *name4,
+                           V &visitor,
+                           bool in_reverse = false) const;
 
 public:  // Operators
 
@@ -2600,24 +2946,30 @@ public:  // Utilities and miscellaneous
     //   Reference to an streamable object (e.g. cout)
     // iof:
     //   Specifies the I/O format. The default is CSV
+    // columns_only:
+    //   If true, it won't write the index column
     //
     template<typename S, typename ... Ts>
     bool
-    write(S &o, io_format iof = io_format::csv) const;
+    write(S &o, io_format iof = io_format::csv,
+          bool columns_only = false) const;
 
     template<typename ... Ts>
     bool
-    write(const char *file_name, io_format iof = io_format::csv) const;
+    write(const char *file_name, io_format iof = io_format::csv,
+          bool columns_only = false) const;
 
     // Same as write() above, but executed asynchronously
     //
     template<typename S, typename ... Ts>
     [[nodiscard]] std::future<bool>
-    write_async(S &o, io_format iof = io_format::csv) const;
+    write_async(S &o, io_format iof = io_format::csv,
+                bool columns_only = false) const;
 
     template<typename ... Ts>
     [[nodiscard]] std::future<bool>
-    write_async(const char *file_name, io_format iof = io_format::csv) const;
+    write_async(const char *file_name, io_format iof = io_format::csv,
+                bool columns_only = false) const;
 
     // It inputs the contents of a text file into itself (i.e. DataFrame).
     // Currently two formats (i.e. csv, json) are supported specified by
@@ -2650,22 +3002,29 @@ public:  // Utilities and miscellaneous
     //   Complete path to the file
     // iof:
     //   Specifies the I/O format. The default is CSV
+    // columns_only:
+    //   If true, it won't read the index column. It assumes an index with
+    //   matching granularity already exists.
     //
     template<typename S>
     bool
-    read(S &in_s, io_format iof = io_format::csv);
+    read(S &in_s, io_format iof = io_format::csv,
+         bool columns_only = false);
 
     bool
-    read(const char *file_name, io_format iof = io_format::csv);
+    read(const char *file_name, io_format iof = io_format::csv,
+         bool columns_only = false);
 
     // Same as read() above, but executed asynchronously
     //
     [[nodiscard]] std::future<bool>
-    read_async(const char *file_name, io_format iof = io_format::csv);
+    read_async(const char *file_name, io_format iof = io_format::csv,
+               bool columns_only = false);
 
     template<typename S>
     [[nodiscard]] std::future<bool>
-    read_async(S &in_s, io_format iof = io_format::csv);
+    read_async(S &in_s, io_format iof = io_format::csv,
+               bool columns_only = false);
 
 private:  // Friend Operators
 
@@ -2679,19 +3038,11 @@ protected:
     size_type
     _load_pair(std::pair<T1, T2> &col_name_data);
 
-    template<typename T>
-    static inline constexpr
-    T _get_nan();
-
-    template<typename T>
-    static inline constexpr bool
-    _is_nan(const T &val);
-
 private:  // Static helper functions
 
-    void read_json_(std::ifstream &file);
-    void read_csv_(std::ifstream &file);
-    void read_csv2_(std::ifstream &file);
+    void read_json_(std::ifstream &file, bool columns_only);
+    void read_csv_(std::ifstream &file, bool columns_only);
+    void read_csv2_(std::ifstream &file, bool columns_only);
 
     template<typename CF, typename ... Ts>
     static void
@@ -2878,70 +3229,8 @@ private:  // Static helper functions
         const std::vector<JoinSortingPair<T>> &col_vec_lhs,
         const std::vector<JoinSortingPair<T>> &col_vec_rhs);
 
-    template<typename V>
-    static bool
-    is_monotonic_increasing_(const V &column);
-
-    template<typename V>
-    static bool
-    is_strictly_monotonic_increasing_(const V &column);
-
-    template<typename V>
-    static bool
-    is_monotonic_decreasing_(const V &column);
-
-    template<typename V>
-    static bool
-    is_strictly_monotonic_decreasing_(const V &column);
-
-    template<typename V>
-    static bool
-    is_normal_(const V &column, double epsilon, bool check_for_standard);
-
-    template<typename V>
-    static bool
-    is_lognormal_(const V &column, double epsilon);
-
-    template<typename V>
-    static void
-    shift_right_(V &vec, size_type n);
-
-    template<typename V>
-    static void
-    shift_left_(V &vec, size_type n);
-
-    template<typename V>
-    static void
-    rotate_right_(V &vec, size_type n);
-
-    template<typename V>
-    static void
-    rotate_left_(V &vec, size_type n);
-
     // Visiting functors
 #   include <DataFrame/Internals/DataFrame_functors.h>
-
-private:  // Tuple stuff
-
-    template<typename ... Ts, typename F, std::size_t ... Is>
-    static void
-    for_each_in_tuple_(const std::tuple<Ts ...> &tu,
-                       F func,
-                       std::index_sequence<Is ...>);
-
-    template<typename ... Ts, typename F, std::size_t ... Is>
-    static void
-    for_each_in_tuple_(std::tuple<Ts ...> &tu,
-                       F func,
-                       std::index_sequence<Is ...>);
-
-    template<typename ... Ts, typename F>
-    static void
-    for_each_in_tuple_(const std::tuple<Ts...> &tu, F func);
-
-    template<typename ... Ts, typename F>
-    static void
-    for_each_in_tuple_(std::tuple<Ts...> &tu, F func);
 };
 
 } // namespace hmdf
@@ -2958,6 +3247,7 @@ private:  // Tuple stuff
 #  include <DataFrame/Internals/DataFrame_read.tcc>
 #  include <DataFrame/Internals/DataFrame_set.tcc>
 #  include <DataFrame/Internals/DataFrame_shift.tcc>
+#  include <DataFrame/Internals/DataFrame_visit.tcc>
 #  include <DataFrame/Internals/DataFrame_write.tcc>
 #endif // HMDF_DO_NOT_INCLUDE_TCC_FILES
 

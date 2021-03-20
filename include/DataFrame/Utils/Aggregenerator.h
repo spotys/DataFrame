@@ -1,5 +1,5 @@
 // Hossein Moein
-// November 27, 2018
+// December 29 2020
 /*
 Copyright (c) 2019-2022, Hossein Moein
 All rights reserved.
@@ -27,18 +27,53 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <DataFrame/Utils/ThreadGranularity.h>
+#pragma once
 
-#include <thread>
+#include <cassert>
+#include <iterator>
+#include <tuple>
+
+#if defined(_WIN32) && defined(HMDF_SHARED)
+#  ifdef LIBRARY_EXPORTS
+#    define LIBRARY_API __declspec(dllexport)
+#  else
+#    define LIBRARY_API __declspec(dllimport)
+#  endif // LIBRARY_EXPORTS
+#else
+#  define LIBRARY_API
+#endif // _WIN32
 
 // ----------------------------------------------------------------------------
 
 namespace hmdf
 {
 
-unsigned int        ThreadGranularity::num_of_threads_ = 0;
-const unsigned int  ThreadGranularity::supported_threads_ =
-    std::thread::hardware_concurrency();
+template<typename OP, typename  ... Ts>
+class Aggregenerator  {
+
+public:
+
+    Aggregenerator() = delete;
+    Aggregenerator(const Aggregenerator &that) = delete;
+    Aggregenerator operator = (const Aggregenerator &rhs) = delete;
+
+    Aggregenerator(Aggregenerator &&that) = default;
+    Aggregenerator operator = (Aggregenerator &&rhs) = default;
+    ~Aggregenerator() = default;
+
+    Aggregenerator (OP &&opt, Ts& ... args) : opt_(std::move(opt))  {
+
+        args_ = std::forward_as_tuple(args ...);
+
+        const std::size_t   vec_s =
+        	std::distance(std::get<0>(args_), std::get<1>(args_));
+    }
+
+private:
+
+    OP                     opt_;
+    std::tuple<Ts& ...>    args_;
+};
 
 } // namespace hmdf
 

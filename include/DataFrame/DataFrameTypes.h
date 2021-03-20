@@ -79,7 +79,7 @@ struct NotImplemented : public DataFrameError  {
 
 // ----------------------------------------------------------------------------
 
-inline constexpr const char *const  DF_INDEX_COL_NAME = "INDEX";
+inline constexpr const char *DF_INDEX_COL_NAME = "INDEX";
 
 // ----------------------------------------------------------------------------
 
@@ -237,9 +237,10 @@ enum class time_frequency : unsigned char  {
 // ----------------------------------------------------------------------------
 
 enum class return_policy : unsigned char  {
-    log = 1,
-    percentage = 2,
-    monetary = 3,
+    log = 1,         // log(t1 / t0)
+    percentage = 2,  // (t1 - t0) / t0
+    monetary = 3,    // t1 - t0
+    trinary = 4,     // 1 if t1 - t0 > 0, -1 if t1 - t0 < 0, else 0
 };
 
 // ----------------------------------------------------------------------------
@@ -380,6 +381,11 @@ struct Index2D  {
 
 // ----------------------------------------------------------------------------
 
+template<typename V>
+using GroupBySpec = std::tuple<const char *, const char *, V>;
+
+// ----------------------------------------------------------------------------
+
 template<typename, typename>
 struct template_switch {  };
 
@@ -415,23 +421,6 @@ using DataFrameView = DataFrame<I, HeteroView>;
 
 template<typename I>
 using DataFramePtrView = DataFrame<I, HeteroPtrView>;
-
-// ----------------------------------------------------------------------------
-
-// These are templated, so they work for all types
-
-template<typename T>
-inline bool is_nan__(const T &)  { return(false); }
-
-template<>
-inline bool is_nan__<double>(const double &val)  { return(std::isnan(val)); }
-
-template<>
-inline bool is_nan__<float>(const float &val)  { return(std::isnan(val)); }
-
-template<>
-inline bool
-is_nan__<long double>(const long double &val)  { return(std::isnan(val)); }
 
 // ----------------------------------------------------------------------------
 
