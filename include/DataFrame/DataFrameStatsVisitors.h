@@ -97,6 +97,90 @@ namespace hmdf
 // ----------------------------------------------------------------------------
 
 template<typename T, typename I = unsigned long>
+struct LastVisitor {
+
+    DEFINE_VISIT_BASIC_TYPES_2
+
+    inline void
+    operator() (const index_type &, const value_type &val)  {
+
+        if (! skip_nan_ || ! is_nan__(val))  result_ = val;
+    }
+    PASS_DATA_ONE_BY_ONE
+
+    inline void pre ()  { result_ = result_type { }; }
+    inline void post ()  {  }
+    inline result_type get_result () const  { return (result_); }
+
+    DECL_CTOR(LastVisitor)
+
+private:
+
+    result_type result_ {  };
+    const bool  skip_nan_;
+};
+
+// ----------------------------------------------------------------------------
+
+template<typename T, typename I = unsigned long>
+struct FirstVisitor {
+
+    DEFINE_VISIT_BASIC_TYPES_2
+
+    inline void
+    operator() (const index_type &, const value_type &val)  {
+
+        if (! started_)  {  
+            if (! skip_nan_ || ! is_nan__(val))  {
+                result_ = val;
+                started_ = true;
+            }
+        }
+    }
+    PASS_DATA_ONE_BY_ONE
+
+    inline void pre ()  { result_ = result_type { }; started_ = false; }
+    inline void post ()  {  }
+    inline result_type get_result () const  { return (result_); }
+
+    DECL_CTOR(FirstVisitor)
+
+private:
+
+    result_type result_ {  };
+    bool        started_ { false };
+    const bool  skip_nan_;
+};
+
+// ----------------------------------------------------------------------------
+
+template<typename T, typename I = unsigned long>
+struct CountVisitor {
+
+    DEFINE_VISIT_BASIC_TYPES
+    using result_type = std::size_t;
+
+    inline void operator() (const index_type &, const value_type &val)  {
+
+        if (! skip_nan_ || ! is_nan__(val))  count_ += 1;
+    }
+    PASS_DATA_ONE_BY_ONE
+
+    inline void pre ()  { count_ = 0; }
+    inline void post ()  {  }
+    inline result_type get_result () const  { return (count_); }
+
+    DECL_CTOR(CountVisitor)
+
+private:
+
+    result_type count_ { 0 };
+    const bool  skip_nan_;
+};
+
+// ----------------------------------------------------------------------------
+
+template<typename T, typename I = unsigned long>
 struct MeanVisitor {
 
     DEFINE_VISIT_BASIC_TYPES_2
@@ -1389,60 +1473,6 @@ private:
 //
 // Single Action Visitors
 //
-
-template<typename T, typename I = unsigned long>
-struct LastVisitor {
-
-    DEFINE_VISIT_BASIC_TYPES_2
-
-    template <typename K, typename H>
-    inline void
-    operator() (const K &idx_begin,
-                const K &idx_end,
-                const H &column_begin,
-                const H &column_end)  {
-
-        if (std::distance(column_begin, column_end) > 0)
-            result_ = *(column_end - 1);
-    }
-
-    inline void pre ()  { result_ = result_type { }; }
-    inline void post ()  {  }
-    inline result_type get_result () const  { return (result_); }
-
-private:
-
-    result_type result_ {  };
-};
-
-// ----------------------------------------------------------------------------
-
-template<typename T, typename I = unsigned long>
-struct FirstVisitor {
-
-    DEFINE_VISIT_BASIC_TYPES_2
-
-    template <typename K, typename H>
-    inline void
-    operator() (const K &idx_begin,
-                const K &idx_end,
-                const H &column_begin,
-                const H &column_end)  {
-
-        if (std::distance(column_begin, column_end) > 0)
-            result_ = *column_begin;
-    }
-
-    inline void pre ()  { result_ = result_type { }; }
-    inline void post ()  {  }
-    inline result_type get_result () const  { return (result_); }
-
-private:
-
-    result_type result_ {  };
-};
-
-// ----------------------------------------------------------------------------
 
 template<typename T,
          typename I = unsigned long,

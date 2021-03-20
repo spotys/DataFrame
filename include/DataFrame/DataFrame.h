@@ -48,15 +48,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace hmdf
 {
 
-// I: Index (e.g. Timestamp) type. Although an index column need not necessarily
-//    represent time, it could be any built-in or user-defined type.
+// I: Index (e.g. Timestamp) type. Although an index column need not
+//    necessarily represent time, it could be any built-in or user-defined type
 // H: See the static assert below. It can only be either
 //    a HeteroVector (typedef'ed below to StdDataFrame) or
 //    a HeteroView (typedef'ed below to DataFrameView) or
 //    a HeteroPtrView (typedef'ed below to DataFramePtrView)
 //
 // A DataFrame may contain one index and any number of columns of any built-in
-// or user-defined types.
+// or user-defined types
 //
 template<typename I, typename H>
 class LIBRARY_API DataFrame : public ThreadGranularity {
@@ -90,7 +90,7 @@ public:
     DataFrame &operator= (const DataFrame &) = default;
     DataFrame &operator= (DataFrame &&) = default;
 
-    // Because of thread safety, this needs tender loving care 
+    // Because of thread safety, this needs tender loving care
     //
     ~DataFrame();
 
@@ -947,57 +947,70 @@ public:  // Data manipulation
                const char *name4, sort_spec dir4,
                const char *name5, sort_spec dir5);
 
-    // Groupby copies the DataFrame into a temp DataFrame and sorts
-    // the temp df by gb_col_name before performing groupby.
-    // If gb_col_name is DF_INDEX_COL_NAME, it groups by index.
+    // This method groups the DataFrame by the named column of type T.
+    // The group-by’ing is done by equality.
+    // The comparison and equality operators must be well defined for type T.
+    // It returns a new DataFrame that has been group-by’ed.
+    // The summarization of columns is specified by a list of 3-member-tuples
+    // (triples) of the following format:
+    //    1. Current DataFrame column name
+    //    2. Column name for the new bucketized DataFrame
+    //    3. A visitor to aggregate current column to new column
     //
-    // F:
-    //   type functor to be applied to columns to group by
+    // The index column is never summarized in the returned DataFrame. If the
+    // named column is not the index column, than the index of the returned
+    // DataFrame is the last index items of the original DataFrame for the
+    // named column.
+    // If the named column is other than index column, then the returned
+    // DataFrame also has a column with the same name which has the unique
+    // values of the named column.
+    // Also see bucketize().
+    //
     // T:
-    //   type of the groupby column. In case if index, it is type of index
+    //   Type of groupby column. In case if index, it is type of index
     // Ts:
-    //   List all the types of all data columns. A type should be specified in
-    //   the list only once.
-    // func:
-    //   The aggregator functor to do the groupby. All built-in groupby
-    //   aggregators are defined in GroupbyAggregators.h file
-    // gb_col_name:
-    //   Name of the column
-    // already_sorted:
-    //   If the DataFrame is already sorted by gb_col_name, this will save the
-    //   expensive sort operation
+    //   Types of triples to specify the column summarization
+    // col_name:
+    //   Name of the grouop-by'ing column
+    // args:
+    //   List of triples to specify the column summarization
     //
-    template<typename F, typename T, typename ... Ts>
+    template<typename T, typename ... Ts>
     [[nodiscard]] DataFrame
-    groupby(F &&func,
-            const char *gb_col_name,
-            sort_state already_sorted = sort_state::not_sorted) const;
+    groupby1(const char *col_name, Ts&& ... args) const;
 
-    // This is the same as above groupby() but it groups by two columns
+    // This is the same as above groupby1() but it groups by two columns
     //
-    template<typename F, typename T1, typename T2, typename ... Ts>
+    // T1:
+    //   Type of first groupby column. In case if index, it is type of index
+    // T2:
+    //   Type of second groupby column. In case if index, it is type of index
+    // Ts:
+    //   Types of triples to specify the column summarization
+    // col_name1:
+    //   Name of the first grouop-by'ing column
+    // col_name2:
+    //   Name of the second grouop-by'ing column
+    // args:
+    //   List of triples to specify the column summarization
+    //
+    template<typename T1, typename T2, typename ... Ts>
     [[nodiscard]] DataFrame
-    groupby(F &&func,
-            const char *gb_col_name1,
-            const char *gb_col_name2,
-            sort_state already_sorted = sort_state::not_sorted) const;
+    groupby2(const char *col_name1, const char *col_name2, Ts&& ... args) const;
 
-    // Same as groupby() above, but executed asynchronously
+    // Same as groupby1() above, but executed asynchronously
     //
-    template<typename F, typename T, typename ... Ts>
+    template<typename T, typename ... Ts>
     [[nodiscard]] std::future<DataFrame>
-    groupby_async(F &&func,
-                  const char *gb_col_name,
-                  sort_state already_sorted = sort_state::not_sorted) const;
+    groupby1_async(const char *col_name, Ts&& ... args) const;
 
-    // Same as groupby() above, but executed asynchronously
+    // Same as groupby2() above, but executed asynchronously
     //
-    template<typename F, typename T1, typename T2, typename ... Ts>
+    template<typename T1, typename T2, typename ... Ts>
     [[nodiscard]] std::future<DataFrame>
-    groupby_async(F &&func,
-                  const char *gb_col_name1,
-                  const char *gb_col_name2,
-                  sort_state already_sorted = sort_state::not_sorted) const;
+    groupby2_async(const char *col_name1,
+                   const char *col_name2,
+                   Ts&& ... args) const;
 
     // It counts the unique values in the named column.
     // It returns a StdDataFrame of following specs:
@@ -1030,52 +1043,39 @@ public:  // Data manipulation
     }
 
     // It bucketizes the data and index into bucket_interval's,
-    // based on index values and calls the functor for each bucket.
-    // The result of each bucket will be stored in a new DataFrame with
-    // same shape and returned.
+    // based on index values.
+    // You must specify how each column is bucketized by providing 3-member
+    // tuples (triples). Each triple has the format:
+    //    1. Current DataFrame column name
+    //    2. Column name for the new bucketized DataFrame
+    //    3. A visitor to aggregate/bucketize current column to new column
+    //
+    // The result of each bucket will be stored in a new DataFrame and returned.
     // Every data bucket is guaranteed to be as wide as bucket_interval.
-    // This mean some data items at the end may not be included in the
+    // This means some data items at the end may not be included in the
     // new bucketized DataFrame.
     // The index of each bucket will be the last index in the original
     // DataFrame that is less than bucket_interval away from the
     // previous bucket
     //
-    // NOTE:The DataFrame must already be sorted by index.
+    // NOTE: The DataFrame must already be sorted by index.
     //
-    // F:
-    //   Functor type to be applied to columns to bucketize
-    // Ts:
-    //   List all the types of all data columns. A type should be specified in
-    //   the list only once.
-    // func:
-    //   The functor to do summarization and bucktization.
-    //   All built-in bucket aggregators are defined in
-    //   GroupbyAggregators.h file
     // bucket_interval:
     //   Bucket interval is in the index's single value unit. For example if
     //   index is in minutes, bucket_interval will be in the unit of minutes
     //   and so on.
+    // args:
+    //   Variable argument list of triples as specified above
     //
-    template<typename F, typename ... Ts>
+    template<typename ... Ts>
     [[nodiscard]] DataFrame
-    bucketize(F &&func, const IndexType &bucket_interval) const;
+    bucketize(const IndexType &bucket_interval, Ts&& ... args) const;
 
     // Same as bucketize() above, but executed asynchronously
     //
-    template<typename F, typename ... Ts>
+    template<typename ... Ts>
     [[nodiscard]] std::future<DataFrame>
-    bucketize_async(F &&func, const IndexType &bucket_interval) const;
-
-    // This is exactly the same as bucketize() above. The only difference is
-    // it stores the result in itself and returns void.
-    // So after the return the original data is lost and replaced with
-    // bucketized data
-    //
-    // NOTE:The DataFrame must already be sorted by index.
-    //
-    template<typename F, typename ... Ts>
-    void
-    self_bucketize(F &&func, const IndexType &bucket_interval);
+    bucketize_async(const IndexType &bucket_interval, Ts&& ... args) const;
 
     // It transposes the data in the DataFrame.
     // The transpose() is only defined for DataFrame's that have a single
@@ -1239,7 +1239,7 @@ public:  // Data manipulation
     // periods:
     //   Number of periods to shift
     // shift_policy:
-    //   Specifies the direction. In this case it is only up or down. 
+    //   Specifies the direction. In this case it is only up or down.
     //
     template<typename T>
     [[nodiscard]] std::vector<T>

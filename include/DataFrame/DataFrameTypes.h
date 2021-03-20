@@ -79,7 +79,7 @@ struct NotImplemented : public DataFrameError  {
 
 // ----------------------------------------------------------------------------
 
-inline constexpr const char *const  DF_INDEX_COL_NAME = "INDEX";
+inline constexpr const char *DF_INDEX_COL_NAME = "INDEX";
 
 // ----------------------------------------------------------------------------
 
@@ -378,6 +378,11 @@ struct Index2D  {
     T   begin {};
     T   end {};
 };
+
+// ----------------------------------------------------------------------------
+
+template<typename V>
+using GroupBySpec = std::tuple<const char *, const char *, V>;
 
 // ----------------------------------------------------------------------------
 

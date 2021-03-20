@@ -79,7 +79,6 @@ set(${LIBRARY_TARGET_NAME}_SRC
   src/Vectors/HeteroVector.cc
   src/Vectors/HeteroView.cc
   src/Vectors/HeteroPtrView.cc
-  src/Utils/ThreadGranularity.cc
   src/Utils/DateTime.cc
 )
 
@@ -97,7 +96,6 @@ set(${LIBRARY_TARGET_NAME}_HDR
   include/DataFrame/DataFrameMLVisitors.h
   include/DataFrame/DataFrameFinancialVisitors.h
   include/DataFrame/DataFrameTransformVisitors.h
-  include/DataFrame/GroupbyAggregators.h
   include/DataFrame/DataFrameTypes.h
   include/DataFrame/RandGen.h
   include/DataFrame/DataFrameOperators.h
