@@ -525,16 +525,6 @@ void DataFrame<I, H>::read_csv2_(std::istream &file, bool columns_only)  {
                                       type_str,
                                       col_name,
                                       ::atoi(value));
-            else if (! ::strcmp(type_str, "DateTimeAme"))
-                spec_vec.emplace_back(std::vector<DateTime>(),
-                                      type_str,
-                                      col_name,
-                                      ::atoi(value));
-            else if (! ::strcmp(type_str, "DateTimeEur"))
-                spec_vec.emplace_back(std::vector<DateTime>(),
-                                      type_str,
-                                      col_name,
-                                      ::atoi(value));
             else if (! ::strcmp(type_str, "bool"))
                 spec_vec.emplace_back(std::vector<bool>(),
                                       type_str,
