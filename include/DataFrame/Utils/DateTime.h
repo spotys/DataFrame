@@ -279,7 +279,7 @@ private:
 
     inline static const DT_initializer  dt_init_ {  };
 
-    friend class    DT_initializer;
+    friend struct    DT_initializer;
 
     DateType        date_ { INVALID_DATE_ };  // Like 20190518
     HourType        hour_ { INVALID_HOUR_ };
