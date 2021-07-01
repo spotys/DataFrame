@@ -36,15 +36,21 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 template&lt;typename T, typename I = unsigned long&gt;
 struct ModeVisitor;
+
+// -------------------------------------
+
+template&lt;typename T, typename I = unsigned long&gt;
+using mode_v = ModeVisitor&lt;T, I&gt;;
         </B></PRE></font>
       </td>
       <td>
         This is a “single action visitor”, meaning it is passed the whole data vector in one call and you must use the single_act_visit() interface.<BR><BR>
         This functor class finds the N highest mode (N most repeated values) of the given column.<BR>
         The result is an array of N items each of this type:<BR>
+        <I>
         <PRE>
     struct  DataItem  {
-        value_type                value;    // Value of the column item
+        T                         value;    // Value of the column item
         std::vector&lt;I&gt;            indices;  // List of indices where value occurred
 
         // Number of times value occurred
@@ -54,6 +60,7 @@ struct ModeVisitor;
         std::vector&lt;std::size_t&gt;  value_indices_in_col;
     };
         </PRE>
+        </I>
       </td>
       <td width = "12%">
         <B>N</B>: Number of modes to find<BR>

@@ -93,13 +93,28 @@ DataFrame<I, H>::get_column (const char *name)  {
 // ----------------------------------------------------------------------------
 
 template<typename I, typename  H>
-bool
-DataFrame<I, H>::has_column (const char *name) const  {
+template<typename T>
+typename DataFrame<I, H>::template ColumnVecType<T> &
+DataFrame<I, H>::get_column(size_type index)  {
+
+    return (get_column<T>(column_list_[index].first.c_str()));
+}
+
+// ----------------------------------------------------------------------------
+
+template<typename I, typename  H>
+bool DataFrame<I, H>::has_column (const char *name) const  {
 
     auto    iter = column_tb_.find (name);
 
     return (iter != column_tb_.end());
 }
+
+// ----------------------------------------------------------------------------
+
+template<typename I, typename  H>
+bool DataFrame<I, H>::
+has_column(size_type index) const { return (index < column_list_.size()); }
 
 // ----------------------------------------------------------------------------
 
@@ -114,6 +129,28 @@ DataFrame<I, H>::get_column (const char *name) const  {
 // ----------------------------------------------------------------------------
 
 template<typename I, typename  H>
+template<typename T>
+const typename DataFrame<I, H>::template ColumnVecType<T> &
+DataFrame<I, H>::get_column(size_type index) const  {
+
+    return (get_column<T>(column_list_[index].first.c_str()));
+}
+
+// ----------------------------------------------------------------------------
+
+template<typename I, typename  H>
+const typename DataFrame<I, H>::IndexVecType &
+DataFrame<I, H>::get_index() const  { return (indices_); }
+
+// ----------------------------------------------------------------------------
+
+template<typename I, typename  H>
+typename DataFrame<I, H>::IndexVecType &
+DataFrame<I, H>::get_index()  { return (indices_); }
+
+// ----------------------------------------------------------------------------
+
+template<typename I, typename  H>
 template<size_t N, typename ... Ts>
 HeteroVector DataFrame<I, H>::
 get_row(size_type row_num, const std::array<const char *, N> col_names) const {
@@ -121,11 +158,11 @@ get_row(size_type row_num, const std::array<const char *, N> col_names) const {
     if (row_num >= indices_.size())  {
         char buffer [512];
 
-#ifdef _WIN32
+#ifdef _MSC_VER
         sprintf(buffer, "DataFrame::get_row(): ERROR: There aren't %zu rows",
 #else
         sprintf(buffer, "DataFrame::get_row(): ERROR: There aren't %lu rows",
-#endif // _WIN32
+#endif // _MSC_VER
                 row_num);
         throw BadRange(buffer);
     }
@@ -871,11 +908,11 @@ get_data_by_rand (random_policy spec, double n, size_type seed) const  {
 
     sprintf (buffer,
              "DataFrame::get_data_by_rand(): ERROR: "
-#ifdef _WIN32
+#ifdef _MSC_VER
              "Number of rows requested %zu is more than available rows %zu",
 #else
              "Number of rows requested %lu is more than available rows %lu",
-#endif // _WIN32
+#endif // _MSC_VER
              n_rows, index_s);
     throw BadRange (buffer);
 }
@@ -946,11 +983,11 @@ get_view_by_rand (random_policy spec, double n, size_type seed) const  {
 
     sprintf (buffer,
              "DataFrame::get_view_by_rand(): ERROR: "
-#ifdef _WIN32
+#ifdef _MSC_VER
              "Number of rows requested %zu is more than available rows %zu",
 #else
              "Number of rows requested %lu is more than available rows %lu",
-#endif // _WIN32
+#endif // _MSC_VER
              n_rows, index_s);
     throw BadRange (buffer);
 }

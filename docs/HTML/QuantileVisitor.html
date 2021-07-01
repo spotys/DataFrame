@@ -61,17 +61,24 @@ enum class quantile_policy : unsigned char  {
       <td bgcolor="maroon"> <font color="white">
         <PRE><B>#include &lt;DataFrame/DataFrameStatsVisitors.h&gt;
 
-template&lt;typename T,
-         typename I = unsigned long,
-         typename =
-             typename std::enable_if&lt;std::is_arithmetic&lt;T&gt;::value, T&gt;::type&gt;
+template&lt;typename T, typename I = unsigned long&gt;
 struct QuantileVisitor;
+
+// -------------------------------------
+
+template&lt;typename T, typename I = unsigned long&gt;
+using qt_v = QuantileVisitor&lt;T, I&gt;;
         </B></PRE></font>
       </td>
       <td>
         This is a “single action visitor”, meaning it is passed the whole data vector in one call and you must use the single_act_visit() interface.<BR><BR>
         This functor class finds the quantile specified by quantile and q_policy. Please see quantile_policy for more explanation.<BR>
-        <I>explicit QuantileVisitor (value_type quantile, quantile_policy q_policy);</I>
+        <I>
+        <PRE>
+    QuantileVisitor (T quantile,
+                     quantile_policy q_policy);
+        </PRE>
+        </I>
       </td>
       <td width="12%">
         <B>T</B>: Column data type.<BR>

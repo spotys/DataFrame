@@ -36,7 +36,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace hmdf;
 
-typedef StdDataFrame<unsigned long> MyDataFrame;
+// A DataFrame with ulong index type
+//
+using MyDataFrame = StdDataFrame<unsigned long>;
 
 // -----------------------------------------------------------------------------
 
@@ -46,19 +48,19 @@ static void test_get_reindexed()  {
 
     MyDataFrame df;
 
-    std::vector<unsigned long>  idxvec = { 1UL, 2UL, 3UL, 10UL, 5UL,
-                                           7UL, 8UL, 12UL, 9UL, 12UL,
-                                           10UL, 13UL, 10UL, 15UL, 14UL };
-    std::vector<double>         dblvec = { 0.0, 15.0, 14.0, 2.0, 1.0,
-                                           12.0, 11.0, 8.0, 7.0, 6.0,
-                                           5.0, 4.0, 3.0, 9.0, 10.0};
-    std::vector<double>         dblvec2 = { 100.0, 101.0, 102.0, 103.0, 104.0,
-                                            105.0, 106.55, 107.34, 1.8, 111.0,
-                                            112.0, 113.0, 114.0, 115.0, 116.0};
+    std::vector<unsigned long>  idxvec =
+        { 1UL, 2UL, 3UL, 10UL, 5UL, 7UL, 8UL, 12UL, 9UL, 12UL, 10UL, 13UL,
+          10UL, 15UL, 14UL };
+    std::vector<double>         dblvec =
+        { 0.0, 15.0, 14.0, 2.0, 1.0, 12.0, 11.0, 8.0, 7.0, 6.0, 5.0, 4.0, 3.0,
+          9.0, 10.0 };
+    std::vector<double>         dblvec2 =
+        { 100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.55, 107.34, 1.8, 111.0,
+          112.0, 113.0, 114.0, 115.0, 116.0 };
     std::vector<int>            intvec = { 1, 2, 3, 4, 5, 8, 6, 7, 11, 14, 9 };
-    std::vector<std::string>    strvec = { "zz", "bb", "cc", "ww", "ee",
-                                           "ff", "gg", "hh", "ii", "jj",
-                                           "kk", "ll", "mm", "nn", "oo" };
+    std::vector<std::string>    strvec =
+       { "zz", "bb", "cc", "ww", "ee", "ff", "gg", "hh", "ii", "jj", "kk",
+         "ll", "mm", "nn", "oo" };
 
     df.load_data(std::move(idxvec),
                  std::make_pair("dbl_col", dblvec),
@@ -107,19 +109,19 @@ static void test_get_reindexed_view()  {
 
     MyDataFrame df;
 
-    std::vector<unsigned long>  idxvec = { 1UL, 2UL, 3UL, 10UL, 5UL,
-                                           7UL, 8UL, 12UL, 9UL, 12UL,
-                                           10UL, 13UL, 10UL, 15UL, 14UL };
-    std::vector<double>         dblvec = { 0.0, 15.0, 14.0, 2.0, 1.0,
-                                           12.0, 11.0, 8.0, 7.0, 6.0,
-                                           5.0, 4.0, 3.0, 9.0, 10.0};
-    std::vector<double>         dblvec2 = { 100.0, 101.0, 102.0, 103.0, 104.0,
-                                            105.0, 106.55, 107.34, 1.8, 111.0,
-                                            112.0, 113.0, 114.0, 115.0, 116.0};
+    std::vector<unsigned long>  idxvec =
+        { 1UL, 2UL, 3UL, 10UL, 5UL, 7UL, 8UL, 12UL, 9UL, 12UL, 10UL, 13UL,
+          10UL, 15UL, 14UL };
+    std::vector<double>         dblvec =
+        { 0.0, 15.0, 14.0, 2.0, 1.0, 12.0, 11.0, 8.0, 7.0, 6.0, 5.0, 4.0, 3.0,
+          9.0, 10.0 };
+    std::vector<double>         dblvec2 =
+        { 100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.55, 107.34, 1.8, 111.0,
+          112.0, 113.0, 114.0, 115.0, 116.0 };
     std::vector<int>            intvec = { 1, 2, 3, 4, 5, 8, 6, 7, 11, 14, 9 };
-    std::vector<std::string>    strvec = { "zz", "bb", "cc", "ww", "ee",
-                                           "ff", "gg", "hh", "ii", "jj",
-                                           "kk", "ll", "mm", "nn", "oo" };
+    std::vector<std::string>    strvec =
+        { "zz", "bb", "cc", "ww", "ee", "ff", "gg", "hh", "ii", "jj", "kk",
+          "ll", "mm", "nn", "oo" };
 
     df.load_data(std::move(idxvec),
                  std::make_pair("dbl_col", dblvec),
@@ -225,8 +227,7 @@ static void test_load_align_column()  {
 
     MyDataFrame df;
 
-    df.load_data(std::move(idxvec),
-                 std::make_pair("int_col", intvec));
+    df.load_data(std::move(idxvec), std::make_pair("int_col", intvec));
     df.load_align_column("summary_col",
                          std::move(summary_vec),
                          5,
@@ -264,19 +265,19 @@ static void test_get_columns_info()  {
 
     MyDataFrame df;
 
-    std::vector<unsigned long>  idxvec = { 1UL, 2UL, 3UL, 10UL, 5UL,
-                                           7UL, 8UL, 12UL, 9UL, 12UL,
-                                           10UL, 13UL, 10UL, 15UL, 14UL };
-    std::vector<double>         dblvec = { 0.0, 15.0, 14.0, 2.0, 1.0,
-                                           12.0, 11.0, 8.0, 7.0, 6.0,
-                                           5.0, 4.0, 3.0, 9.0, 10.0};
-    std::vector<double>         dblvec2 = { 100.0, 101.0, 102.0, 103.0, 104.0,
-                                            105.0, 106.55, 107.34, 1.8, 111.0,
-                                            112.0, 113.0, 114.0, 115.0, 116.0};
+    std::vector<unsigned long>  idxvec =
+        { 1UL, 2UL, 3UL, 10UL, 5UL, 7UL, 8UL, 12UL, 9UL, 12UL, 10UL, 13UL,
+          10UL, 15UL, 14UL };
+    std::vector<double>         dblvec =
+        { 0.0, 15.0, 14.0, 2.0, 1.0, 12.0, 11.0, 8.0, 7.0, 6.0, 5.0, 4.0, 3.0,
+          9.0, 10.0 };
+    std::vector<double>         dblvec2 =
+        { 100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.55, 107.34, 1.8, 111.0,
+          112.0, 113.0, 114.0, 115.0, 116.0 };
     std::vector<int>            intvec = { 1, 2, 3, 4, 5, 8, 6, 7, 11, 14, 9 };
-    std::vector<std::string>    strvec = { "zz", "bb", "cc", "ww", "ee",
-                                           "ff", "gg", "hh", "ii", "jj",
-                                           "kk", "ll", "mm", "nn", "oo" };
+    std::vector<std::string>    strvec =
+        { "zz", "bb", "cc", "ww", "ee", "ff", "gg", "hh", "ii", "jj", "kk",
+          "ll", "mm", "nn", "oo" };
 
     df.load_data(std::move(idxvec),
                  std::make_pair("dbl_col", dblvec),
@@ -328,16 +329,16 @@ static void test_CategoryVisitor()  {
 
     MyDataFrame df;
 
-    std::vector<unsigned long>  idxvec = { 1UL, 2UL, 3UL, 10UL, 5UL,
-                                           7UL, 8UL, 12UL, 9UL, 12UL,
-                                           10UL, 13UL, 10UL, 15UL, 14UL };
-    std::vector<double>         dblvec = { 0.0, 15.0, 14.0, 15.0, 1.0,
-                                           12.0, 11.0, 8.0, 15.0, 6.0,
-                                           sqrt(-1), 4.0, 14.0, 14.0, 20.0};
+    std::vector<unsigned long>  idxvec =
+        { 1UL, 2UL, 3UL, 10UL, 5UL, 7UL, 8UL, 12UL, 9UL, 12UL, 10UL, 13UL,
+          10UL, 15UL, 14UL };
+    std::vector<double>         dblvec =
+        { 0.0, 15.0, 14.0, 15.0, 1.0, 12.0, 11.0, 8.0, 15.0, 6.0, sqrt(-1),
+          4.0, 14.0, 14.0, 20.0 };
     std::vector<int>            intvec = { 1, 2, 3, 4, 5, 8, 6, 7, 11, 14, 9 };
-    std::vector<std::string>    strvec = { "zz", "bb", "zz", "ww", "ee",
-                                           "ff", "gg", "zz", "ii", "jj",
-                                           "kk", "ll", "mm", "ee", "" };
+    std::vector<std::string>    strvec =
+        { "zz", "bb", "zz", "ww", "ee", "ff", "gg", "zz", "ii", "jj", "kk",
+          "ll", "mm", "ee", "" };
 
     df.load_data(std::move(idxvec),
                  std::make_pair("dbl_col", dblvec),
@@ -381,19 +382,19 @@ static void test_FactorizeVisitor()  {
 
     MyDataFrame df;
 
-    std::vector<unsigned long>  idxvec = { 1UL, 2UL, 3UL, 10UL, 5UL,
-                                           7UL, 8UL, 12UL, 9UL, 12UL,
-                                           10UL, 13UL, 10UL, 15UL, 14UL };
-    std::vector<double>         dblvec = { 0.0, 15.0, 14.0, 2.0, 1.0,
-                                           12.0, 11.0, 8.0, 7.0, 6.0,
-                                           5.0, 4.0, 3.0, 9.0, 10.0};
-    std::vector<double>         dblvec2 = { 100.0, 101.0, 102.0, 103.0, 104.0,
-                                            105.0, 106.55, 107.34, 1.8, 111.0,
-                                            112.0, 113.0, 114.0, 115.0, 116.0};
+    std::vector<unsigned long>  idxvec =
+        { 1UL, 2UL, 3UL, 10UL, 5UL, 7UL, 8UL, 12UL, 9UL, 12UL, 10UL, 13UL,
+          10UL, 15UL, 14UL };
+    std::vector<double>         dblvec =
+        { 0.0, 15.0, 14.0, 2.0, 1.0, 12.0, 11.0, 8.0, 7.0, 6.0, 5.0, 4.0, 3.0,
+          9.0, 10.0 };
+    std::vector<double>         dblvec2 =
+        { 100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.55, 107.34, 1.8, 111.0,
+          112.0, 113.0, 114.0, 115.0, 116.0 };
     std::vector<int>            intvec = { 1, 2, 3, 4, 5, 8, 6, 7, 11, 14, 9 };
-    std::vector<std::string>    strvec = { "zz", "bb", "cc", "ww", "ee",
-                                           "ff", "gg", "hh", "ii", "jj",
-                                           "kk", "ll", "mm", "nn", "oo" };
+    std::vector<std::string>    strvec =
+        { "zz", "bb", "cc", "ww", "ee", "ff", "gg", "hh", "ii", "jj", "kk",
+          "ll", "mm", "nn", "oo" };
 
     df.load_data(std::move(idxvec),
                  std::make_pair("dbl_col", dblvec),
@@ -528,16 +529,16 @@ static void test_ClipVisitor()  {
 
     MyDataFrame df;
 
-    std::vector<unsigned long>  idxvec = { 1UL, 2UL, 3UL, 10UL, 5UL,
-                                           7UL, 8UL, 12UL, 9UL, 12UL,
-                                           10UL, 13UL, 10UL, 15UL, 14UL };
-    std::vector<double>         dblvec = { 0.0, 15.0, 14.0, 15.0, 1.0,
-                                           12.0, 11.0, 8.0, 15.0, 6.0,
-                                           sqrt(-1), 4.0, 14.0, 14.0, 20.0};
+    std::vector<unsigned long>  idxvec =
+        { 1UL, 2UL, 3UL, 10UL, 5UL, 7UL, 8UL, 12UL, 9UL, 12UL, 10UL, 13UL,
+          10UL, 15UL, 14UL };
+    std::vector<double>         dblvec =
+        { 0.0, 15.0, 14.0, 15.0, 1.0, 12.0, 11.0, 8.0, 15.0, 6.0, sqrt(-1),
+          4.0, 14.0, 14.0, 20.0 };
     std::vector<int>            intvec = { 1, 2, 3, 4, 5, 8, 6, 7, 11, 14, 9 };
-    std::vector<std::string>    strvec = { "zz", "bb", "zz", "ww", "ee",
-                                           "ff", "gg", "zz", "ii", "jj",
-                                           "kk", "ll", "mm", "ee", "" };
+    std::vector<std::string>    strvec =
+        { "zz", "bb", "zz", "ww", "ee", "ff", "gg", "zz", "ii", "jj", "kk",
+          "ll", "mm", "ee", "" };
 
     df.load_data(std::move(idxvec),
                  std::make_pair("dbl_col", dblvec),
@@ -568,13 +569,11 @@ static void test_SharpeRatioVisitor()  {
           123457, 123458, 123459, 123460, 123461, 123462, 123466,
           123467, 123468, 123469, 123470, 123471, 123472, 123473 };
     std::vector<double>         d1 =
-        { 2.5, 2.45, -0.65, -0.1, -1.1, 1.87, 0.98,
-          0.34, 1.56, -0.34, 2.3, -0.34, -1.9, 0.387,
-          0.123, 1.06, -0.65, 2.03, 0.4, -1.0, 0.59 };
+        { 2.5, 2.45, -0.65, -0.1, -1.1, 1.87, 0.98, 0.34, 1.56, -0.34, 2.3,
+          -0.34, -1.9, 0.387, 0.123, 1.06, -0.65, 2.03, 0.4, -1.0, 0.59 };
     std::vector<double>         d2 =
-        { 0.2, 0.58, -0.60, -0.08, 0.05, 0.87, 0.2,
-          0.4, 0.5, 0.06, 0.3, -0.34, -0.9, 0.8,
-          -0.4, 0.86, 0.01, 1.02, -0.02, -1.5, 0.2 };
+        { 0.2, 0.58, -0.60, -0.08, 0.05, 0.87, 0.2, 0.4, 0.5, 0.06, 0.3, -0.34,
+          -0.9, 0.8, -0.4, 0.86, 0.01, 1.02, -0.02, -1.5, 0.2 };
     std::vector<int>            i1 = { 22, 23, 24, 25, 99 };
     MyDataFrame                 df;
 
@@ -643,18 +642,18 @@ static void test_RankVisitor()  {
     const auto  last_result2 =
         df.single_act_visit<double>("d2_col", last_rank_v).get_result();
 
-    std::vector<double> ar_equal {8, 1, 2, 3, 4, 12, 5, 6, 7, 9, 0, 11, 13,
-                                  10, 15, 16, 17, 18, 19, 20, 14 };
+    std::vector<double> ar_equal { 8, 1, 2, 3, 4, 12, 5, 6, 7, 9, 0, 11, 13,
+                                   10, 15, 16, 17, 18, 19, 20, 14 };
 
     assert(actual_result2 == ar_equal);
-    ar_equal = std::vector<double> {9, 1, 2, 3, 4, 13, 5, 6, 7, 9, 0, 11, 13,
-                                    9, 15, 16, 17, 18, 19, 20, 13};
+    ar_equal = std::vector<double> { 9, 1, 2, 3, 4, 13, 5, 6, 7, 9, 0, 11, 13,
+                                     9, 15, 16, 17, 18, 19, 20, 13 };
     assert(avg_result2 == ar_equal);
-    ar_equal = std::vector<double> {8, 1, 2, 3, 4, 12, 5, 6, 7, 8, 0, 11, 12,
-                                    8, 15, 16, 17, 18, 19, 20, 12};
+    ar_equal = std::vector<double> { 8, 1, 2, 3, 4, 12, 5, 6, 7, 8, 0, 11, 12,
+                                     8, 15, 16, 17, 18, 19, 20, 12 };
     assert(first_result2 == ar_equal);
-    ar_equal = std::vector<double> {10, 1, 2, 3, 4, 14, 5, 6, 7, 10, 0, 11, 14,
-                                    10, 15, 16, 17, 18, 19, 20, 14};
+    ar_equal = std::vector<double> { 10, 1, 2, 3, 4, 14, 5, 6, 7, 10, 0, 11, 14,
+                                     10, 15, 16, 17, 18, 19, 20, 14 };
     assert(last_result2 == ar_equal);
 }
 
@@ -858,10 +857,10 @@ static void test_remove_duplicates()  {
           10UL, 13UL, 10UL, 15UL, 14UL };
     std::vector<double>         dblvec =
         { 0.0, 15.0, 14.0, 2.0, 15.0, 12.0, 11.0, 8.0, 7.0, 6.0,
-          5.0, 4.0, 3.0, 9.0, 10.0};
+          5.0, 4.0, 3.0, 9.0, 10.0 };
     std::vector<double>         dblvec2 =
         { 100.0, 101.0, 102.0, 103.0, 101.0, 105.0, 106.55, 107.34, 1.8, 111.0,
-          112.0, 113.0, 114.0, 115.0, 116.0};
+          112.0, 113.0, 114.0, 115.0, 116.0 };
     std::vector<int>            intvec = { 1, 2, 3, 4, 2, 8, 6, 7, 11, 14, 9 };
     std::vector<std::string>    strvec =
         { "zz", "bb", "cc", "ww", "bb", "ff", "gg", "hh", "ii", "jj",
@@ -968,11 +967,13 @@ static void test_bucketize()  {
     MyDataFrame df;
 
     try  {
-        df.read("FORD.csv", io_format::csv2);
+        df.read("data/FORD.csv", io_format::csv2);
 
         auto        fut =
             df.bucketize_async(
+                bucket_type::by_distance,
                 100,
+                LastVisitor<MyDataFrame::IndexType, MyDataFrame::IndexType>(),
                 std::make_tuple("Date", "Date", LastVisitor<std::string>()),
                 std::make_tuple("FORD_Close", "High", MaxVisitor<double>()),
                 std::make_tuple("FORD_Close", "Low", MinVisitor<double>()),
@@ -985,6 +986,26 @@ static void test_bucketize()  {
 
         result.write<std::ostream, std::string, double, long>
             (std::cout, io_format::csv2);
+
+        // FORD index is just an increasing number starting from 0.
+        // So, by_count should give the same result as by_distance
+        //
+        auto        fut2 =
+            df.bucketize_async(
+                bucket_type::by_count,
+                100,
+                LastVisitor<MyDataFrame::IndexType, MyDataFrame::IndexType>(),
+                std::make_tuple("Date", "Date", LastVisitor<std::string>()),
+                std::make_tuple("FORD_Close", "High", MaxVisitor<double>()),
+                std::make_tuple("FORD_Close", "Low", MinVisitor<double>()),
+                std::make_tuple("FORD_Close", "Open", FirstVisitor<double>()),
+                std::make_tuple("FORD_Close", "Close", LastVisitor<double>()),
+                std::make_tuple("FORD_Close", "Mean", MeanVisitor<double>()),
+                std::make_tuple("FORD_Close", "Std", StdVisitor<double>()),
+                std::make_tuple("FORD_Volume", "Volume", SumVisitor<long>()));
+        MyDataFrame result2 = fut2.get();
+
+        assert((result.is_equal<double, std::string, long>(result2)));
     }
     catch (const DataFrameError &ex)  {
         std::cout << ex.what() << std::endl;
@@ -1031,6 +1052,7 @@ static void test_groupby()  {
     auto    fut1 =
         df.groupby1_async<unsigned long>
             (DF_INDEX_COL_NAME,
+             LastVisitor<MyDataFrame::IndexType, MyDataFrame::IndexType>(),
              std::make_tuple("str_col", "sum_str", SumVisitor<std::string>()),
              std::make_tuple("xint_col", "max_int", MaxVisitor<int>()),
              std::make_tuple("xint_col", "min_int", MinVisitor<int>()),
@@ -1043,6 +1065,7 @@ static void test_groupby()  {
     auto    fut2 =
         df.groupby1_async<unsigned long>
             ("ul_col",
+             LastVisitor<MyDataFrame::IndexType, MyDataFrame::IndexType>(),
              std::make_tuple("str_col", "sum_str", SumVisitor<std::string>()),
              std::make_tuple("xint_col", "max_int", MaxVisitor<int>()),
              std::make_tuple("xint_col", "min_int", MinVisitor<int>()),
@@ -1055,6 +1078,7 @@ static void test_groupby()  {
     auto    fut3 =
         df.groupby1_async<double>
             ("dbl_col_2",
+             MaxVisitor<MyDataFrame::IndexType, MyDataFrame::IndexType>(),
              std::make_tuple("str_col", "sum_str", SumVisitor<std::string>()),
              std::make_tuple("xint_col", "max_int", MaxVisitor<int>()),
              std::make_tuple("xint_col", "min_int", MinVisitor<int>()),
@@ -1069,8 +1093,10 @@ static void test_groupby()  {
 
 static void test_groupby_2()  {
 
-#ifndef _WIN32  // Due to a bug in MS VC++ compiler being used by appveyor, this
-                // cannot be compiled by them
+// Due to a bug in MS VC++ compiler being used by appveyor, this cannot be
+// compiled by them
+//
+#ifndef _MSC_VER
 
     std::cout << "\nTesting groupby_2( ) ..." << std::endl;
 
@@ -1109,6 +1135,7 @@ static void test_groupby_2()  {
         df.groupby2<unsigned long, double>
             (DF_INDEX_COL_NAME,
              "dbl_col_2",
+             LastVisitor<MyDataFrame::IndexType, MyDataFrame::IndexType>(),
              std::make_tuple("str_col", "sum_str", SumVisitor<std::string>()),
              std::make_tuple("xint_col", "max_int", MaxVisitor<int>()),
              std::make_tuple("xint_col", "min_int", MinVisitor<int>()),
@@ -1122,6 +1149,7 @@ static void test_groupby_2()  {
         df.groupby2<double, unsigned long>
             ("dbl_col_2",
              DF_INDEX_COL_NAME,
+             MinVisitor<MyDataFrame::IndexType, MyDataFrame::IndexType>(),
              std::make_tuple("str_col", "sum_str", SumVisitor<std::string>()),
              std::make_tuple("xint_col", "max_int", MaxVisitor<int>()),
              std::make_tuple("xint_col", "min_int", MinVisitor<int>()),
@@ -1135,6 +1163,7 @@ static void test_groupby_2()  {
         df.groupby2<double, int>
             ("dbl_col_2",
              "xint_col",
+             MaxVisitor<MyDataFrame::IndexType, MyDataFrame::IndexType>(),
              std::make_tuple("str_col", "sum_str", SumVisitor<std::string>()),
              std::make_tuple("xint_col", "max_int", MaxVisitor<int>()),
              std::make_tuple("xint_col", "min_int", MinVisitor<int>()),
@@ -1148,6 +1177,7 @@ static void test_groupby_2()  {
         df.groupby2<int, double>
             ("xint_col",
              "dbl_col_2",
+             FirstVisitor<MyDataFrame::IndexType, MyDataFrame::IndexType>(),
              std::make_tuple("str_col", "sum_str", SumVisitor<std::string>()),
              std::make_tuple("xint_col", "max_int", MaxVisitor<int>()),
              std::make_tuple("xint_col", "min_int", MinVisitor<int>()),
@@ -1161,6 +1191,7 @@ static void test_groupby_2()  {
         df.groupby2<std::string, unsigned long>
             ("str_col",
              DF_INDEX_COL_NAME,
+             FirstVisitor<MyDataFrame::IndexType, MyDataFrame::IndexType>(),
              std::make_tuple("str_col", "sum_str", SumVisitor<std::string>()),
              std::make_tuple("xint_col", "max_int", MaxVisitor<int>()),
              std::make_tuple("xint_col", "min_int", MinVisitor<int>()),
@@ -1169,7 +1200,66 @@ static void test_groupby_2()  {
 
     result5.write<std::ostream, std::string, double, std::size_t, int>
         (std::cout, io_format::csv2);
-#endif // _WIN32
+
+#endif // !_MSC_VER
+}
+
+// -----------------------------------------------------------------------------
+
+static void test_groupby_3()  {
+
+// Due to a bug in MS VC++ compiler being used by appveyor, this cannot be
+// compiled by them
+//
+#ifndef _MSC_VER
+
+    std::cout << "\nTesting groupby_3( ) ..." << std::endl;
+
+    std::vector<unsigned long>  ulgvec2 =
+        { 1, 2, 2, 2, 3, 4, 5, 5, 6, 6, 6, 7, 8, 9, 10, 10, 10, 11, 11, 11, 12,
+          13, 13, 14, 15, 16, 17, 17 };
+    std::vector<unsigned long>  xulgvec2 = ulgvec2;
+    std::vector<int>            intvec2 =
+        { 1, 2, 3, 4, 5, 3, 7, 3, 9, 10, 3, 2, 3, 14,
+          2, 2, 2, 3, 2, 3, 3, 3, 3, 3, 36, 2, 45, 2 };
+    std::vector<double>         xdblvec2 =
+        { 10, 20, 20, 11, 30, 40, 50, 50, 50, 50, 80, 90, 50, 11, 11, 25, 20,
+          30, 1, 2, 2, 2, 6, 2, 3, 10, 4, 5 };
+    std::vector<double>         dblvec22 =
+        { 0.998, 1.545, 0.056, 0.15678, 1.545, 0.923, 0.06743,
+          0.1, -1.545, 0.07865, -0.9999, 1.545, 0.1002, -0.8888,
+          0.14, 0.0456, -1.545, -0.8999, 0.01119, 0.8002, -1.545,
+          0.2, 0.1056, 0.87865, -0.6999, 1.545, 0.1902, -1.545 };
+    std::vector<std::string>    strvec2 =
+        { "A", "A", "A", "B", "C", "C", "C", "C", "Z", "S", "M", "B",
+          "A", "H", "X", "B", "Y", "Y", "W", "K", "K", "K", "J", "N",
+          "Y", "G", "K", "B" };
+
+    MyDataFrame df;
+
+    df.load_data(std::move(ulgvec2),
+                 std::make_pair("xint_col", intvec2),
+                 std::make_pair("dbl_col", xdblvec2),
+                 std::make_pair("dbl_col_2", dblvec22),
+                 std::make_pair("str_col", strvec2),
+                 std::make_pair("ul_col", xulgvec2));
+
+    auto    result1 =
+        df.groupby3<double, unsigned long, std::string>
+            ("dbl_col",
+             DF_INDEX_COL_NAME,
+             "str_col",
+             LastVisitor<MyDataFrame::IndexType, MyDataFrame::IndexType>(),
+             std::make_tuple("str_col", "sum_str", SumVisitor<std::string>()),
+             std::make_tuple("xint_col", "max_int", MaxVisitor<int>()),
+             std::make_tuple("xint_col", "min_int", MinVisitor<int>()),
+             std::make_tuple("dbl_col_2", "cnt_dbl", CountVisitor<double>()),
+             std::make_tuple("dbl_col", "sum_dbl", SumVisitor<double>()));
+
+    result1.write<std::ostream, std::string, double, std::size_t, int>
+        (std::cout, io_format::csv2);
+
+#endif // !_MSC_VER
 }
 
 // -----------------------------------------------------------------------------
@@ -1210,8 +1300,7 @@ static void test_io_format_csv2()  {
 
     MyDataFrame df;
 
-    df.load_data(std::move(ulgvec2),
-                 std::make_pair("ul_col", xulgvec2));
+    df.load_data(std::move(ulgvec2), std::make_pair("ul_col", xulgvec2));
     df.load_column("xint_col",
                    std::move(intvec2),
                    nan_policy::dont_pad_with_nans);
@@ -1238,7 +1327,7 @@ static void test_io_format_csv2()  {
     MyDataFrame df_read;
 
     try  {
-        df_read.read("csv2_format_data.csv", io_format::csv2);
+        df_read.read("data/csv2_format_data.csv", io_format::csv2);
     }
     catch (const DataFrameError &ex)  {
         std::cout << ex.what() << std::endl;
@@ -1524,9 +1613,11 @@ static void test_LogFitVisitor()  {
     df.load_column<double>("Y1",
                            { 6, 7, 8, 9, 3 },
                            nan_policy::dont_pad_with_nans);
-    df.load_column<double>("X2", { 1, 2, 4, 6, 8 },
+    df.load_column<double>("X2",
+                           { 1, 2, 4, 6, 8 },
                            nan_policy::dont_pad_with_nans);
-    df.load_column<double>("Y2", { 1, 3, 4, 5, 6 },
+    df.load_column<double>("Y2",
+                           { 1, 3, 4, 5, 6 },
                            nan_policy::dont_pad_with_nans);
 
     LogFitVisitor<double>   log_v1;
@@ -2065,29 +2156,27 @@ static void test_DecomposeVisitor()  {
 
 // -----------------------------------------------------------------------------
 
-static void test_IBM_data()  {
+static void test_DT_IBM_data()  {
 
-    std::cout << "\nTesting IBM_data(  ) ..." << std::endl;
+    std::cout << "\nTesting DT_IBM_data(  ) ..." << std::endl;
 
-    typedef StdDataFrame<std::string> StrDataFrame;
+    typedef StdDataFrame<DateTime>  DT_DataFrame;
 
-    StrDataFrame    df;
+    DT_DataFrame    df;
 
-    df.read("IBM.csv", io_format::csv2);
+    try  {
+        df.read("data/DT_IBM.csv", io_format::csv2);
 
-    DecomposeVisitor<double, std::string> d_v(178, 2.0 / 3.0, 0,
-                                              decompose_type::multiplicative);
-    // decompose_type::additive);
-
-    df.single_act_visit<double>("IBM_Adj_Close", d_v);
-
-    const auto  &ibm_closes = df.get_column<double>("IBM_Adj_Close");
-
-    for (std::size_t i = 0; i < ibm_closes.size(); ++i)
-        std::cout << ibm_closes[i] << ","
-                  << d_v.get_trend()[i] << ","
-                  << d_v.get_seasonal()[i] << ","
-                  << d_v.get_residual()[i] << std::endl;
+        assert(df.get_column<double>("IBM_Open")[0] == 98.4375);
+        assert(df.get_column<double>("IBM_Close")[18] == 97.875);
+        assert(df.get_index()[18] == DateTime(20001128));
+        assert(fabs(df.get_column<double>("IBM_High")[5030] - 111.8) < 0.001);
+        assert(df.get_column<long>("IBM_Volume")[5022] == 21501100L);
+        assert(df.get_index()[5020] == DateTime(20201016));
+    }
+    catch (const DataFrameError &ex)  {
+        std::cout << ex.what() << std::endl;
+    }
 }
 
 // --------------------------------------------------------------------
@@ -2153,11 +2242,11 @@ static void test_MassIndexVisitor()  {
 
     std::cout << "\nTesting MassIndexVisitor{  } ..." << std::endl;
 
-    std::vector<unsigned long>  idx =
-        { 123450, 123451, 123452, 123453, 123454, 123455, 123456, 123457,
-          123458, 123459, 123460, 123461, 123462, 123466, 123467, 123468,
-          123469, 123470, 123471, 123472, 123473,
-        };
+    std::vector<unsigned long>  idx = {
+        123450, 123451, 123452, 123453, 123454, 123455, 123456, 123457,
+        123458, 123459, 123460, 123461, 123462, 123466, 123467, 123468,
+        123469, 123470, 123471, 123472, 123473,
+    };
     std::vector<double>         high = {
         121.75, 122.75, 124.83, 124.39, 135.5, 132, 128.25, 127.15, 126.94,
         125.22, 126.43, 127.35, 120.15, 117.69, 116.06, 116.62, 114.9, 112.22,
@@ -2178,14 +2267,16 @@ static void test_MassIndexVisitor()  {
 
     // The values here are nonsensical, because the time-series and periods
     // are too short
+    //
     df.single_act_visit<double, double>("high", "low", mi_v);
+
     assert(mi_v.get_result().size() == 21);
     assert(std::isnan(mi_v.get_result()[0]));
     assert(std::isnan(mi_v.get_result()[3]));
-    assert(fabs(mi_v.get_result()[6] - 5.20339) < 0.00001);
-    assert(fabs(mi_v.get_result()[10] - 4.35729) < 0.00001);
-    assert(fabs(mi_v.get_result()[20] - 5.51908) < 0.00001);
-    assert(fabs(mi_v.get_result()[17] - 4.87229) < 0.0001);
+    assert(fabs(mi_v.get_result()[6] - 5.21367) < 0.00001);
+    assert(fabs(mi_v.get_result()[10] - 4.3473) < 0.0001);
+    assert(fabs(mi_v.get_result()[20] - 5.51902) < 0.00001);
+    assert(fabs(mi_v.get_result()[17] - 4.87194) < 0.0001);
 }
 
 // -----------------------------------------------------------------------------
@@ -2329,7 +2420,7 @@ static void test_WilliamPrcRVisitor()  {
     StrDataFrame    df;
 
     try  {
-        df.read("IBM.csv", io_format::csv2);
+        df.read("data/IBM.csv", io_format::csv2);
 
         WilliamPrcRVisitor<double, std::string> wpr_v;
 
@@ -2360,7 +2451,7 @@ static void test_PSLVisitor()  {
     StrDataFrame    df;
 
     try  {
-        df.read("IBM.csv", io_format::csv2);
+        df.read("data/IBM.csv", io_format::csv2);
 
         PSLVisitor<double, std::string> psl_v;
 
@@ -2400,7 +2491,7 @@ static void test_CCIVisitor()  {
     StrDataFrame    df;
 
     try  {
-        df.read("IBM.csv", io_format::csv2);
+        df.read("data/IBM.csv", io_format::csv2);
 
         CCIVisitor<double, std::string> cci_v;
 
@@ -2466,7 +2557,7 @@ static void test_GarmanKlassVolVisitor()  {
     StrDataFrame    df;
 
     try  {
-        df.read("IBM.csv", io_format::csv2);
+        df.read("data/IBM.csv", io_format::csv2);
 
         GarmanKlassVolVisitor<double, std::string>  gkv_v;
 
@@ -2496,7 +2587,7 @@ static void test_YangZhangVolVisitor()  {
     MyDataFrame df;
 
     try  {
-        df.read("FORD.csv", io_format::csv2);
+        df.read("data/FORD.csv", io_format::csv2);
 
         YangZhangVolVisitor<double> yz_v;
 
@@ -2555,8 +2646,7 @@ static void test_no_index_writes()  {
 
     MyDataFrame df;
 
-    df.load_data(std::move(ulgvec2),
-                 std::make_pair("ul_col", xulgvec2));
+    df.load_data(std::move(ulgvec2), std::make_pair("ul_col", xulgvec2));
     df.load_column("xint_col",
                    std::move(intvec2),
                    nan_policy::dont_pad_with_nans);
@@ -2629,9 +2719,9 @@ static void test_no_index_reads()  {
     MyDataFrame df3;
 
     try  {
-        df.read("csv2_format_data.csv", io_format::csv2, false);
-        df.read("csv2_format_data_2.csv", io_format::csv2, true);
-        df.read("csv2_format_data_no_index.csv", io_format::csv2, true);
+        df.read("data/csv2_format_data.csv", io_format::csv2, false);
+        df.read("data/csv2_format_data_2.csv", io_format::csv2, true);
+        df.read("data/csv2_format_data_no_index.csv", io_format::csv2, true);
         df.write<std::ostream,
                  int,
                  unsigned long,
@@ -2640,9 +2730,9 @@ static void test_no_index_reads()  {
                  std::string>(std::cout, io_format::csv2);
 
         std::cout << '\n' << std::endl;
-        df2.read("sample_data.csv", io_format::csv, false);
-        df2.read("sample_data_2.csv", io_format::csv, true);
-        df2.read("sample_data_no_index.csv", io_format::csv, true);
+        df2.read("data/sample_data.csv", io_format::csv, false);
+        df2.read("data/sample_data_2.csv", io_format::csv, true);
+        df2.read("data/sample_data_no_index.csv", io_format::csv, true);
         df2.write<std::ostream,
                   int,
                   unsigned long,
@@ -2651,9 +2741,9 @@ static void test_no_index_reads()  {
                   std::string>(std::cout, io_format::csv2);
 
         std::cout << '\n' << std::endl;
-        df3.read("sample_data.json", io_format::json, false);
-        df3.read("sample_data_2.json", io_format::json, true);
-        df3.read("sample_data_no_index.json", io_format::json, true);
+        df3.read("data/sample_data.json", io_format::json, false);
+        df3.read("data/sample_data_2.json", io_format::json, true);
+        df3.read("data/sample_data_no_index.json", io_format::json, true);
         df3.write<std::ostream,
                   int,
                   unsigned long,
@@ -2677,7 +2767,7 @@ static void test_KamaVisitor()  {
     StrDataFrame    df;
 
     try  {
-        df.read("IBM.csv", io_format::csv2);
+        df.read("data/IBM.csv", io_format::csv2);
 
         KamaVisitor<double, std::string>    k_v;
 
@@ -2709,7 +2799,7 @@ static void test_FisherTransVisitor()  {
     StrDataFrame    df;
 
     try  {
-        df.read("IBM.csv", io_format::csv2);
+        df.read("data/IBM.csv", io_format::csv2);
 
         FisherTransVisitor<double, std::string> ft_v;
 
@@ -2741,7 +2831,7 @@ static void test_PercentPriceOSCIVisitor()  {
     StrDataFrame    df;
 
     try  {
-        df.read("IBM.csv", io_format::csv2);
+        df.read("data/IBM.csv", io_format::csv2);
 
         PercentPriceOSCIVisitor<double, std::string>    ppo_v;
 
@@ -2773,7 +2863,7 @@ static void test_SlopeVisitor()  {
     StrDataFrame    df;
 
     try  {
-        df.read("IBM.csv", io_format::csv2);
+        df.read("data/IBM.csv", io_format::csv2);
 
         SlopeVisitor<double, std::string>   s_v (10, true, true);
 
@@ -2805,7 +2895,7 @@ static void test_UltimateOSCIVisitor()  {
     StrDataFrame    df;
 
     try  {
-        df.read("IBM.csv", io_format::csv2);
+        df.read("data/IBM.csv", io_format::csv2);
 
         UltimateOSCIVisitor<double, std::string> uo_v;
 
@@ -2884,7 +2974,7 @@ static void test_UlcerIndexVisitor()  {
     StrDataFrame    df;
 
     try  {
-        df.read("IBM.csv", io_format::csv2);
+        df.read("data/IBM.csv", io_format::csv2);
 
         UlcerIndexVisitor<double, std::string>  ui_v;
 
@@ -2919,6 +3009,400 @@ static void test_UlcerIndexVisitor()  {
 
 // -----------------------------------------------------------------------------
 
+static void test_RSXVisitor()  {
+
+    std::cout << "\nTesting RSXVisitor{  } ..." << std::endl;
+
+    typedef StdDataFrame<std::string> StrDataFrame;
+
+    StrDataFrame    df;
+
+    try  {
+        df.read("data/IBM.csv", io_format::csv2);
+
+        RSXVisitor<double, std::string> rsx_v;
+
+        df.single_act_visit<double>("IBM_Close", rsx_v);
+
+        assert(rsx_v.get_result().size() == 5031);
+        assert(std::isnan(rsx_v.get_result()[0]));
+        assert(std::isnan(rsx_v.get_result()[12]));
+        assert(rsx_v.get_result()[13] == 0);
+        assert(rsx_v.get_result()[14] == 50.0);
+        assert(rsx_v.get_result()[26] == 50.0);
+        assert(std::abs(rsx_v.get_result()[29] - 44.2103) < 0.0001);
+        assert(std::abs(rsx_v.get_result()[34] - 37.4583) < 0.0001);
+        assert(std::abs(rsx_v.get_result()[5030] - 21.0277) < 0.0001);
+        assert(std::abs(rsx_v.get_result()[5026] - 31.1071) < 0.0001);
+    }
+    catch (const DataFrameError &ex)  {
+        std::cout << ex.what() << std::endl;
+    }
+}
+
+// -----------------------------------------------------------------------------
+
+static void test_TTMTrendVisitor()  {
+
+    std::cout << "\nTesting TTMTrendVisitor{  } ..." << std::endl;
+
+    typedef StdDataFrame<std::string> StrDataFrame;
+
+    StrDataFrame    df;
+
+    try  {
+        df.read("data/IBM.csv", io_format::csv2);
+
+        TTMTrendVisitor<double, std::string>    ttmt_v;
+
+        df.single_act_visit<double, double, double>
+            ("IBM_Low", "IBM_High", "IBM_Close", ttmt_v);
+
+        assert(ttmt_v.get_result().size() == 5031);
+        assert((! ttmt_v.get_result()[0]));
+        assert((! ttmt_v.get_result()[8]));
+        assert(ttmt_v.get_result()[9]);
+        assert(ttmt_v.get_result()[13]);
+        assert((! ttmt_v.get_result()[14]));
+        assert(ttmt_v.get_result()[5030]);
+        assert((! ttmt_v.get_result()[5027]));
+        assert(ttmt_v.get_result()[5016]);
+    }
+    catch (const DataFrameError &ex)  {
+        std::cout << ex.what() << std::endl;
+    }
+}
+
+// -----------------------------------------------------------------------------
+
+static void test_ParabolicSARVisitor()  {
+
+    std::cout << "\nTesting ParabolicSARVisitor{  } ..." << std::endl;
+
+    typedef StdDataFrame<std::string> StrDataFrame;
+
+    StrDataFrame    df;
+
+    try  {
+        df.read("data/SHORT_IBM.csv", io_format::csv2);
+
+        ParabolicSARVisitor<double, std::string>    psar_v;
+
+        df.single_act_visit<double, double, double>
+            ("IBM_Low", "IBM_High", "IBM_Close", psar_v);
+
+        assert(psar_v.get_result().size() == 1721);
+        assert((! psar_v.get_result()[0]));
+        assert((psar_v.get_result()[2]));
+        assert((psar_v.get_result()[3]));
+        assert((psar_v.get_result()[26]));
+        assert((! psar_v.get_result()[1720]));
+        assert((! psar_v.get_result()[1718]));
+        assert((psar_v.get_result()[1709]));
+
+        assert(psar_v.get_longs().size() == 1721);
+        assert(std::isnan(psar_v.get_longs()[0]));
+        assert(std::isnan(psar_v.get_longs()[2]));
+        assert(std::abs(psar_v.get_longs()[5] - 185.401) < 0.001);
+        assert(std::abs(psar_v.get_longs()[11] - 183.86) < 0.01);
+        assert(std::isnan(psar_v.get_longs()[18]));
+        assert(std::isnan(psar_v.get_longs()[1720]));
+        assert(std::abs(psar_v.get_longs()[1708] - 124.46) < 0.01);
+
+        assert(psar_v.get_shorts().size() == 1721);
+        assert(std::isnan(psar_v.get_shorts()[0]));
+        assert(std::abs(psar_v.get_shorts()[2] - 187.4) < 0.1);
+        assert(std::isnan(psar_v.get_shorts()[6]));
+        assert(std::abs(psar_v.get_shorts()[7] - 190.35) < 0.01);
+        assert(std::abs(psar_v.get_shorts()[1720] - 120.7) < 0.1);
+        assert(std::isnan(psar_v.get_shorts()[1708]));
+
+        assert(psar_v.get_acceleration_factors().size() == 1721);
+        assert(psar_v.get_acceleration_factors()[0] == 0.02);
+        assert(psar_v.get_acceleration_factors()[2] == 0.02);
+        assert(psar_v.get_acceleration_factors()[15] == 0.02);
+        assert(psar_v.get_acceleration_factors()[16] == 0.04);
+        assert(psar_v.get_acceleration_factors()[1720] == 0.14);
+        assert(std::abs(psar_v.get_acceleration_factors()[1718] - 0.12) < 0.01);
+    }
+    catch (const DataFrameError &ex)  {
+        std::cout << ex.what() << std::endl;
+    }
+}
+
+// -----------------------------------------------------------------------------
+
+static void test_EBSineWaveVisitor()  {
+
+    std::cout << "\nTesting EBSineWaveVisitor{  } ..." << std::endl;
+
+    typedef StdDataFrame<std::string> StrDataFrame;
+
+    StrDataFrame    df;
+
+    try  {
+        df.read("data/SHORT_IBM.csv", io_format::csv2);
+
+        EBSineWaveVisitor<double, std::string>  ebsw_v;
+
+        df.single_act_visit<double>("IBM_Close", ebsw_v);
+
+        assert(ebsw_v.get_result().size() == 1721);
+        assert(std::isnan(ebsw_v.get_result()[0]));
+        assert(std::abs(ebsw_v.get_result()[5] - 0.927837) < 0.00001);
+        assert(std::abs(ebsw_v.get_result()[14] - -0.560866) < 0.00001);
+        assert(std::abs(ebsw_v.get_result()[25] - -0.36883) < 0.00001);
+        assert(std::abs(ebsw_v.get_result()[1720] - -0.901317) < 0.00001);
+        assert(std::abs(ebsw_v.get_result()[1712] - -0.730321) < 0.00001);
+        assert(std::abs(ebsw_v.get_result()[1707] - 0.841759) < 0.00001);
+    }
+    catch (const DataFrameError &ex)  {
+        std::cout << ex.what() << std::endl;
+    }
+}
+
+// -----------------------------------------------------------------------------
+
+static void test_EhlerSuperSmootherVisitor()  {
+
+    std::cout << "\nTesting EhlerSuperSmootherVisitor{  } ..." << std::endl;
+
+    typedef StdDataFrame<std::string> StrDataFrame;
+
+    StrDataFrame    df;
+
+    try  {
+        df.read("data/SHORT_IBM.csv", io_format::csv2);
+
+        EhlerSuperSmootherVisitor<double, std::string>  ssf_v2; // poles = 2
+        EhlerSuperSmootherVisitor<double, std::string>  ssf_v3(3); // poles = 3
+
+        df.single_act_visit<double>("IBM_Close", ssf_v2);
+        df.single_act_visit<double>("IBM_Close", ssf_v3);
+
+        assert(ssf_v2.get_result().size() == 1721);
+        assert(ssf_v3.get_result().size() == 1721);
+
+        assert(std::abs(ssf_v2.get_result()[0] - 185.53) < 0.01);
+        assert(std::abs(ssf_v2.get_result()[5] - 188.117) < 0.001);
+        assert(std::abs(ssf_v2.get_result()[14] - 185.497) < 0.001);
+        assert(std::abs(ssf_v2.get_result()[25] - 174.736) < 0.001);
+        assert(std::abs(ssf_v2.get_result()[1720] - 109.294) < 0.001);
+        assert(std::abs(ssf_v2.get_result()[1712] - 123.43) < 0.01);
+        assert(std::abs(ssf_v2.get_result()[1707] - 127.323) < 0.001);
+
+        assert(std::abs(ssf_v3.get_result()[0] - 185.53) < 0.01);
+        assert(std::abs(ssf_v3.get_result()[5] - 186.159) < 0.001);
+        assert(std::abs(ssf_v3.get_result()[14] - 186.681) < 0.001);
+        assert(std::abs(ssf_v3.get_result()[25] - 174.294) < 0.001);
+        assert(std::abs(ssf_v3.get_result()[1720] - 109.187) < 0.001);
+        assert(std::abs(ssf_v3.get_result()[1712] - 124.31) < 0.01);
+        assert(std::abs(ssf_v3.get_result()[1707] - 127.603) < 0.001);
+    }
+    catch (const DataFrameError &ex)  {
+        std::cout << ex.what() << std::endl;
+    }
+}
+
+// -----------------------------------------------------------------------------
+
+static void test_VarIdxDynAvgVisitor()  {
+
+    std::cout << "\nTesting VarIdxDynAvgVisitor{  } ..." << std::endl;
+
+    typedef StdDataFrame<std::string> StrDataFrame;
+
+    StrDataFrame    df;
+
+    try  {
+        df.read("data/SHORT_IBM.csv", io_format::csv2);
+
+        VarIdxDynAvgVisitor<double, std::string>    vidya_v;
+
+        df.single_act_visit<double>("IBM_Close", vidya_v);
+
+        assert(vidya_v.get_result().size() == 1721);
+
+        assert(std::isnan(vidya_v.get_result()[0]));
+        assert(std::isnan(vidya_v.get_result()[12]));
+        assert(vidya_v.get_result()[13] == 0);
+        assert(std::abs(vidya_v.get_result()[14] - 2.70068) < 0.00001);
+        assert(std::abs(vidya_v.get_result()[21] - 57.6682) < 0.0001);
+        assert(std::abs(vidya_v.get_result()[31] - 106.451) < 0.001);
+        assert(std::abs(vidya_v.get_result()[1720] - 118.962) < 0.001);
+        assert(std::abs(vidya_v.get_result()[1712] - 123.811) < 0.001);
+        assert(std::abs(vidya_v.get_result()[1707] - 123.712) < 0.001);
+    }
+    catch (const DataFrameError &ex)  {
+        std::cout << ex.what() << std::endl;
+    }
+}
+
+// -----------------------------------------------------------------------------
+
+static void test_AbsVisitor()  {
+
+    std::cout << "\nTesting AbsVisitor{ } ..." << std::endl;
+
+    MyDataFrame df;
+
+    std::vector<unsigned long>  idxvec =
+        { 1UL, 2UL, 3UL, 10UL, 5UL, 7UL, 8UL, 12UL, 9UL, 12UL, 10UL, 13UL,
+          10UL, 15UL, 14UL };
+    std::vector<double>         dblvec =
+        { 0.0, -15.0, 14.0, 15.0, -1.0, 12.0, 11.0, -8.0, 15.0, 6.0, -1,
+          4.0, 14.0, 14.0, -20.0 };
+    std::vector<int>            intvec =
+        { -1, 2, 3, 4, 5, 8, -6, 7, 11, -14, 9, -3, -5, -4, 9 };
+    std::vector<std::string>    strvec =
+        { "zz", "bb", "zz", "ww", "ee", "ff", "gg", "zz", "ii", "jj", "kk",
+          "ll", "mm", "ee", "" };
+
+    df.load_data(std::move(idxvec),
+                 std::make_pair("dbl_col", dblvec),
+                 std::make_pair("int_col", intvec),
+                 std::make_pair("str_col", strvec));
+
+    AbsVisitor<double>  abs_v;
+    AbsVisitor<int>     abs_v_int;
+    auto                result =
+        df.visit<double>("dbl_col", abs_v).get_result();
+    auto                result_int =
+        df.single_act_visit<int>("int_col", abs_v_int).get_result();
+
+    assert(result == 5);
+    assert(result_int == 6);
+
+    std::vector<double> abs_dblvec =
+        { 0.0, 15.0, 14.0, 15.0, 1.0, 12.0, 11.0, 8.0, 15.0, 6.0, 1,
+          4.0, 14.0, 14.0, 20.0 };
+    std::vector<int>    abs_intvec =
+        { 1, 2, 3, 4, 5, 8, 6, 7, 11, 14, 9, 3, 5, 4, 9 };
+
+    assert((df.get_column<double>("dbl_col") == abs_dblvec));
+    assert((df.get_column<int>("int_col") == abs_intvec));
+}
+
+// -----------------------------------------------------------------------------
+
+static void test_PivotPointSRVisitor()  {
+
+    std::cout << "\nTesting PivotPointSRVisitor{  } ..." << std::endl;
+
+    typedef StdDataFrame<std::string> StrDataFrame;
+
+    StrDataFrame    df;
+
+    try  {
+        df.read("data/SHORT_IBM.csv", io_format::csv2);
+
+        PivotPointSRVisitor<double, std::string>    ppsr_v;
+
+        df.single_act_visit<double, double, double>
+            ("IBM_Low", "IBM_High", "IBM_Close", ppsr_v);
+
+        assert(ppsr_v.get_result().size() == 1721);
+        assert(std::abs(ppsr_v.get_result()[0] - 186.043) < 0.001);
+        assert(std::abs(ppsr_v.get_result()[5] - 187.81) < 0.01);
+        assert(std::abs(ppsr_v.get_result()[14] - 182.387) < 0.001);
+        assert(std::abs(ppsr_v.get_result()[25] - 176.627) < 0.001);
+        assert(std::abs(ppsr_v.get_result()[1720] - 110.403) < 0.001);
+        assert(std::abs(ppsr_v.get_result()[1712] - 118.12) < 0.01);
+        assert(std::abs(ppsr_v.get_result()[1707] - 125.57) < 0.01);
+
+        assert(ppsr_v.get_resist_1().size() == 1721);
+        assert(std::abs(ppsr_v.get_resist_1()[0] - 186.887) < 0.001);
+        assert(std::abs(ppsr_v.get_resist_1()[5] - 189.07) < 0.01);
+        assert(std::abs(ppsr_v.get_resist_1()[14] - 184.063) < 0.001);
+        assert(std::abs(ppsr_v.get_resist_1()[25] - 178.183) < 0.001);
+        assert(std::abs(ppsr_v.get_resist_1()[1720] - 113.057) < 0.001);
+        assert(std::abs(ppsr_v.get_resist_1()[1712] - 119.4) < 0.01);
+        assert(std::abs(ppsr_v.get_resist_1()[1707] - 126.68) < 0.01);
+
+        assert(ppsr_v.get_support_1().size() == 1721);
+        assert(std::abs(ppsr_v.get_support_1()[0] - 184.687) < 0.001);
+        assert(std::abs(ppsr_v.get_support_1()[5] - 186.12) < 0.01);
+        assert(std::abs(ppsr_v.get_support_1()[14] - 181.053) < 0.001);
+        assert(std::abs(ppsr_v.get_support_1()[25] - 175.693) < 0.001);
+        assert(std::abs(ppsr_v.get_support_1()[1720] - 109.007) < 0.001);
+        assert(std::abs(ppsr_v.get_support_1()[1712] - 116.09) < 0.01);
+        assert(std::abs(ppsr_v.get_support_1()[1707] - 123.99) < 0.01);
+
+        assert(ppsr_v.get_resist_2().size() == 1721);
+        assert(std::abs(ppsr_v.get_resist_2()[0] - 188.243) < 0.001);
+        assert(std::abs(ppsr_v.get_resist_2()[5] - 190.76) < 0.01);
+        assert(std::abs(ppsr_v.get_resist_2()[14] - 185.397) < 0.001);
+        assert(std::abs(ppsr_v.get_resist_2()[25] - 179.117) < 0.001);
+        assert(std::abs(ppsr_v.get_resist_2()[1720] - 114.453) < 0.001);
+        assert(std::abs(ppsr_v.get_resist_2()[1712] - 121.43) < 0.01);
+        assert(std::abs(ppsr_v.get_resist_2()[1707] - 128.26) < 0.01);
+
+        assert(ppsr_v.get_support_2().size() == 1721);
+        assert(std::abs(ppsr_v.get_support_2()[0] - 183.843) < 0.001);
+        assert(std::abs(ppsr_v.get_support_2()[5] - 184.86) < 0.01);
+        assert(std::abs(ppsr_v.get_support_2()[14] - 179.377) < 0.001);
+        assert(std::abs(ppsr_v.get_support_2()[25] - 174.137) < 0.001);
+        assert(std::abs(ppsr_v.get_support_2()[1720] - 106.353) < 0.001);
+        assert(std::abs(ppsr_v.get_support_2()[1712] - 114.81) < 0.01);
+        assert(std::abs(ppsr_v.get_support_2()[1707] - 122.88) < 0.01);
+
+        assert(ppsr_v.get_resist_3().size() == 1721);
+        assert(std::abs(ppsr_v.get_resist_3()[0] - 189.087) < 0.001);
+        assert(std::abs(ppsr_v.get_resist_3()[5] - 192.02) < 0.01);
+        assert(std::abs(ppsr_v.get_resist_3()[14] - 187.073) < 0.001);
+        assert(std::abs(ppsr_v.get_resist_3()[25] - 180.673) < 0.001);
+        assert(std::abs(ppsr_v.get_resist_3()[1720] - 117.107) < 0.001);
+        assert(std::abs(ppsr_v.get_resist_3()[1712] - 122.71) < 0.01);
+        assert(std::abs(ppsr_v.get_resist_3()[1707] - 129.37) < 0.01);
+
+        assert(ppsr_v.get_support_3().size() == 1721);
+        assert(std::abs(ppsr_v.get_support_3()[0] - 182.487) < 0.001);
+        assert(std::abs(ppsr_v.get_support_3()[5] - 183.17) < 0.01);
+        assert(std::abs(ppsr_v.get_support_3()[14] - 178.043) < 0.001);
+        assert(std::abs(ppsr_v.get_support_3()[25] - 173.203) < 0.001);
+        assert(std::abs(ppsr_v.get_support_3()[1720] - 104.957) < 0.001);
+        assert(std::abs(ppsr_v.get_support_3()[1712] - 112.78) < 0.01);
+        assert(std::abs(ppsr_v.get_support_3()[1707] - 121.3) < 0.01);
+    }
+    catch (const DataFrameError &ex)  {
+        std::cout << ex.what() << std::endl;
+    }
+}
+
+// -----------------------------------------------------------------------------
+
+static void test_AvgDirMovIdxVisitor()  {
+
+    std::cout << "\nTesting AvgDirMovIdxVisitor{  } ..." << std::endl;
+
+    typedef StdDataFrame<std::string> StrDataFrame;
+
+    StrDataFrame    df;
+
+    try  {
+        df.read("data/SHORT_IBM.csv", io_format::csv2);
+
+        adx_v<double, std::string>  adx_v (3, 4);
+
+        df.single_act_visit<double, double, double>
+            ("IBM_Low", "IBM_High", "IBM_Close", adx_v);
+
+        assert(adx_v.get_result().size() == 1721);
+        assert(adx_v.get_result()[0] == 0);
+        assert(std::abs(adx_v.get_result()[10] - 0.73029) < 0.00001);
+        assert(std::abs(adx_v.get_result()[14] - 0.735792) < 0.000001);
+        assert(std::abs(adx_v.get_result()[25] - 0.691082) < 0.000001);
+        assert(std::abs(adx_v.get_result()[1720] - 0.372184) < 0.000001);
+        assert(std::abs(adx_v.get_result()[1712] - 0.703394) < 0.000001);
+        assert(std::abs(adx_v.get_result()[1707] - 0.383002) < 0.000001);
+    }
+    catch (const DataFrameError &ex)  {
+        std::cout << ex.what() << std::endl;
+    }
+}
+
+// -----------------------------------------------------------------------------
+
 int main(int argc, char *argv[]) {
 
     test_get_reindexed();
@@ -2938,6 +3422,7 @@ int main(int argc, char *argv[]) {
     test_remove_duplicates();
     test_groupby();
     test_groupby_2();
+    test_groupby_3();
     test_io_format_csv2();
     test_BoxCoxVisitor();
     test_NormalizeVisitor();
@@ -2953,7 +3438,7 @@ int main(int argc, char *argv[]) {
     test_LowessVisitor();
     test_StepRollAdopter();
     test_DecomposeVisitor();
-    // test_IBM_data();
+    test_DT_IBM_data();
     test_TTestVisitor();
     test_MassIndexVisitor();
     test_HullRollingMeanVisitor();
@@ -2975,6 +3460,15 @@ int main(int argc, char *argv[]) {
     test_shifting_column();
     test_UlcerIndexVisitor();
     test_bucketize();
+    test_RSXVisitor();
+    test_TTMTrendVisitor();
+    test_ParabolicSARVisitor();
+    test_EBSineWaveVisitor();
+    test_EhlerSuperSmootherVisitor();
+    test_VarIdxDynAvgVisitor();
+    test_AbsVisitor();
+    test_PivotPointSRVisitor();
+    test_AvgDirMovIdxVisitor();
 
     return (0);
 }

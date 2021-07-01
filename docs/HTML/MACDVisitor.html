@@ -34,11 +34,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       <td bgcolor="maroon"> <font color="white">
         <PRE><B>#include &lt;DataFrame/DataFrameStatsVisitors.h&gt;
 
-template&lt;typename T,
-         typename I = unsigned long,
-         typename =
-             typename std::enable_if&lt;std::is_arithmetic&lt;T&gt;::value, T&gt;::type&gt;
+template&lt;typename T, typename I = unsigned long&gt;
 struct MACDVisitor;
+
+// -------------------------------------
+
+template&lt;typename T, typename I = unsigned long&gt;
+using macd_v = MACDVisitor&lt;T, I&gt;;
         </B></PRE></font>
       </td>
       <td>
@@ -52,11 +54,13 @@ struct MACDVisitor;
           <LI>Decay type for the exponential moving averages.</LI>
           <LI>Decay value for the exponential moving averages (See DataFrame Types and Exponential Roll Adopter).</LI>
         </UL>
+        <I>
         <PRE>
-    MACDVisitor(size_type short_mean_period,  // e.g. 12-day
-                size_type long_mean_period,   // e.g. 26-day
-                size_type signal_line_period) // e.g.  9-day
+    MACDVisitor(std::size_t short_mean_period,   // e.g. 12-day
+                std::size_t long_mean_period,    // e.g. 26-day
+                std::size_t signal_line_period); // e.g.  9-day
         </PRE>
+        </I>
         <OL>
         There are 3 methods that give you the results:
           <LI>const result_type &amp;get_macd_line() const – Returns vector of MACD Line (See above).</LI>

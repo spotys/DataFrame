@@ -34,11 +34,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       <td bgcolor="maroon"> <font color="white">
         <PRE><B>#include &lt;DataFrame/DataFrameStatsVisitors.h&gt;
 
-template&lt;typename T,
-         typename I = unsigned long,
-         typename =
-             typename std::enable_if&lt;std::is_arithmetic&lt;T&gt;::value, T&gt;::type&gt;
+template&lt;typename T, typename I = unsigned long&gt;
 struct NormalizeVisitor;
+
+// -------------------------------------
+
+template&lt;typename T, typename I = unsigned long&gt;
+using norm_v = NormalizeVisitor&lt;T, I&gt;;
         </B></PRE></font>
       </td>
       <td>
@@ -53,12 +55,15 @@ struct NormalizeVisitor;
 
     <tr bgcolor="lightgrey">
       <td bgcolor="maroon"> <font color="white">
-        <PRE><B>
-template&lt;typename T,
-         typename I = unsigned long,
-         typename =
-             typename std::enable_if&lt;std::is_arithmetic&lt;T&gt;::value, T&gt;::type&gt;
+        <PRE><B>#include &lt;DataFrame/DataFrameStatsVisitors.h&gt;
+
+template&lt;typename T, typename I = unsigned long&gt;
 struct StandardizeVisitor;
+
+// -------------------------------------
+
+template&lt;typename T, typename I = unsigned long&gt;
+using stand_v = StandardizeVisitor&lt;T, I&gt;;
         </B></PRE></font>
       </td>
       <td>

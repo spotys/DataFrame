@@ -51,6 +51,28 @@ DataFrame<I, H>::~DataFrame()  {
 // ----------------------------------------------------------------------------
 
 template<typename I, typename H>
+bool DataFrame<I, H>::empty() const noexcept  { return (indices_.empty()); }
+
+// ----------------------------------------------------------------------------
+
+template<typename I, typename H>
+bool DataFrame<I, H>::
+shapeless() const noexcept  { return (empty() && column_list_.empty()); }
+
+// ----------------------------------------------------------------------------
+
+template<typename I, typename H>
+void DataFrame<I, H>::set_lock (SpinLock *sl)  { lock_ = sl; }
+
+// ----------------------------------------------------------------------------
+
+template<typename I, typename H>
+void DataFrame<I, H>::remove_lock ()  { lock_ = nullptr; }
+
+// ----------------------------------------------------------------------------
+
+
+template<typename I, typename H>
 template<typename CF, typename ... Ts>
 void DataFrame<I, H>::sort_common_(DataFrame<I, H> &df, CF &&comp_func)  {
 
@@ -416,6 +438,25 @@ fill_missing(const std::array<const char *, N> col_names,
 // ----------------------------------------------------------------------------
 
 template<typename I, typename H>
+template<typename DF, typename ... Ts>
+void DataFrame<I, H>::fill_missing (const DF &rhs)  {
+
+    const auto  &self_idx = get_index();
+    const auto  &rhs_idx = rhs.get_index();
+
+    for (auto col_citer : column_list_)  {
+        fill_missing_functor_<DF, Ts ...>   functor (
+            self_idx, rhs_idx, rhs, col_citer.first.c_str());
+
+        data_[col_citer.second].change(functor);
+    }
+
+    return;
+}
+
+// ----------------------------------------------------------------------------
+
+template<typename I, typename H>
 template<typename T>
 void DataFrame<I, H>::
 drop_missing_rows_(T &vec,
@@ -462,8 +503,8 @@ drop_missing(drop_policy policy, size_type threshold)  {
     size_type                       thread_count = 0;
     const size_type                 data_size = data_.size();
 
-    map_missing_rows_functor_<Ts ...>   functor (indices_.size(),
-                                                 missing_row_map);
+    map_missing_rows_functor_<Ts ...>   functor (
+        indices_.size(), missing_row_map);
 
     for (size_type idx = 0; idx < data_size; ++idx)  {
         if (thread_count >= get_thread_level())
@@ -493,10 +534,8 @@ drop_missing(drop_policy policy, size_type threshold)  {
                        threshold,
                        data_size);
 
-    drop_missing_rows_functor_<Ts ...>  functor2 (missing_row_map,
-                                                  policy,
-                                                  threshold,
-                                                  data_.size());
+    drop_missing_rows_functor_<Ts ...>  functor2 (
+        missing_row_map, policy, threshold, data_.size());
 
     for (size_type idx = 0; idx < data_size; ++idx)  {
         if (thread_count >= get_thread_level())
@@ -504,7 +543,7 @@ drop_missing(drop_policy policy, size_type threshold)  {
         else  {
             auto    to_be_called =
                 static_cast
-                    <void(DataVec::*)(drop_missing_rows_functor_<Ts ...>&&)>
+                    <void(DataVec::*)(drop_missing_rows_functor_<Ts ...> &&)>
                         (&DataVec::template
                              change<drop_missing_rows_functor_<Ts ...>>);
 
@@ -1079,16 +1118,16 @@ sort_async(const char *name1, sort_spec dir1,
 // ----------------------------------------------------------------------------
 
 template<typename I, typename H>
-template<typename T, typename ... Ts>
+template<typename T, typename I_V, typename ... Ts>
 DataFrame<I, H> DataFrame<I, H>::
-groupby1(const char *col_name, Ts&& ... args) const  {
+groupby1(const char *col_name, I_V &&idx_visitor, Ts&& ... args) const  {
 
     const ColumnVecType<T>  *gb_vec { nullptr };
 
     if (! ::strcmp(col_name, DF_INDEX_COL_NAME))
-        gb_vec = (ColumnVecType<T> *) &(get_index());
+        gb_vec = (const ColumnVecType<T> *) &(get_index());
     else
-        gb_vec = (ColumnVecType<T> *) &(get_column<T>(col_name));
+        gb_vec = (const ColumnVecType<T> *) &(get_column<T>(col_name));
 
     std::vector<std::size_t>    sort_v (gb_vec->size(), 0);
 
@@ -1101,10 +1140,16 @@ groupby1(const char *col_name, Ts&& ... args) const  {
     DataFrame   res;
     auto        args_tuple = std::tuple<Ts ...>(args ...);
     auto        func =
-        [this, &res, gb_vec, &sort_v, col_name](auto &triple) mutable -> void {
+        [this,
+         &res,
+         gb_vec,
+         &sort_v,
+         idx_visitor = std::forward<I_V>(idx_visitor),
+         col_name](auto &triple) mutable -> void {
             _load_groupby_data_1_(*this,
                                   res,
                                   triple,
+                                  idx_visitor,
                                   *gb_vec,
                                   sort_v,
                                   col_name);
@@ -1118,24 +1163,27 @@ groupby1(const char *col_name, Ts&& ... args) const  {
 // ----------------------------------------------------------------------------
 
 template<typename I, typename H>
-template<typename T1, typename T2, typename ... Ts>
+template<typename T1, typename T2, typename I_V, typename ... Ts>
 DataFrame<I, H> DataFrame<I, H>::
-groupby2(const char *col_name1, const char *col_name2, Ts&& ... args) const  {
+groupby2(const char *col_name1,
+         const char *col_name2,
+         I_V &&idx_visitor,
+         Ts&& ... args) const  {
 
     const ColumnVecType<T1> *gb_vec1 { nullptr };
     const ColumnVecType<T2> *gb_vec2 { nullptr };
 
     if (! ::strcmp(col_name1, DF_INDEX_COL_NAME))  {
-        gb_vec1 = (ColumnVecType<T1> *) &(get_index());
-        gb_vec2 = (ColumnVecType<T2> *) &(get_column<T2>(col_name2));
+        gb_vec1 = (const ColumnVecType<T1> *) &(get_index());
+        gb_vec2 = (const ColumnVecType<T2> *) &(get_column<T2>(col_name2));
     }
     else if (! ::strcmp(col_name2, DF_INDEX_COL_NAME))  {
-        gb_vec1 = (ColumnVecType<T1> *) &(get_column<T1>(col_name1));
-        gb_vec2 = (ColumnVecType<T2> *) &(get_index());
+        gb_vec1 = (const ColumnVecType<T1> *) &(get_column<T1>(col_name1));
+        gb_vec2 = (const ColumnVecType<T2> *) &(get_index());
     }
     else  {
-        gb_vec1 = (ColumnVecType<T1> *) &(get_column<T1>(col_name1));
-        gb_vec2 = (ColumnVecType<T2> *) &(get_column<T2>(col_name2));
+        gb_vec1 = (const ColumnVecType<T1> *) &(get_column<T1>(col_name1));
+        gb_vec2 = (const ColumnVecType<T2> *) &(get_column<T2>(col_name2));
     }
 
     std::vector<std::size_t>    sort_v (std::min(gb_vec1->size(),
@@ -1160,11 +1208,13 @@ groupby2(const char *col_name1, const char *col_name2, Ts&& ... args) const  {
          gb_vec1,
          gb_vec2,
          &sort_v,
+         idx_visitor = std::forward<I_V>(idx_visitor),
          col_name1,
          col_name2](auto &triple) mutable -> void {
             _load_groupby_data_2_(*this,
                                   res,
                                   triple,
+                                  idx_visitor,
                                   *gb_vec1,
                                   *gb_vec2,
                                   sort_v,
@@ -1180,32 +1230,141 @@ groupby2(const char *col_name1, const char *col_name2, Ts&& ... args) const  {
 // ----------------------------------------------------------------------------
 
 template<typename I, typename H>
-template<typename T, typename ... Ts>
-std::future<DataFrame<I, H>> DataFrame<I, H>::
-groupby1_async(const char *col_name, Ts&& ... args) const  {
+template<typename T1, typename T2, typename T3, typename I_V, typename ... Ts>
+DataFrame<I, H> DataFrame<I, H>::
+groupby3(const char *col_name1,
+         const char *col_name2,
+         const char *col_name3,
+         I_V &&idx_visitor,
+         Ts&& ... args) const  {
 
-    return (std::async(std::launch::async,
-                       &DataFrame::groupby1<T, Ts ...>,
-                           this,
-                           col_name,
-                           args ...));
+    const ColumnVecType<T1> *gb_vec1 { nullptr };
+    const ColumnVecType<T2> *gb_vec2 { nullptr };
+    const ColumnVecType<T3> *gb_vec3 { nullptr };
+
+    if (! ::strcmp(col_name1, DF_INDEX_COL_NAME))  {
+        gb_vec1 = (const ColumnVecType<T1> *) &(get_index());
+        gb_vec2 = (const ColumnVecType<T2> *) &(get_column<T2>(col_name2));
+        gb_vec3 = (const ColumnVecType<T3> *) &(get_column<T3>(col_name3));
+    }
+    else if (! ::strcmp(col_name2, DF_INDEX_COL_NAME))  {
+        gb_vec1 = (const ColumnVecType<T1> *) &(get_column<T1>(col_name1));
+        gb_vec2 = (const ColumnVecType<T2> *) &(get_index());
+        gb_vec3 = (const ColumnVecType<T3> *) &(get_column<T3>(col_name3));
+    }
+    else if (! ::strcmp(col_name3, DF_INDEX_COL_NAME))  {
+        gb_vec1 = (const ColumnVecType<T1> *) &(get_column<T1>(col_name1));
+        gb_vec2 = (const ColumnVecType<T2> *) &(get_column<T2>(col_name2));
+        gb_vec3 = (const ColumnVecType<T3> *) &(get_index());
+    }
+    else  {
+        gb_vec1 = (const ColumnVecType<T1> *) &(get_column<T1>(col_name1));
+        gb_vec2 = (const ColumnVecType<T2> *) &(get_column<T2>(col_name2));
+        gb_vec3 = (const ColumnVecType<T3> *) &(get_column<T3>(col_name3));
+    }
+
+    std::vector<std::size_t>    sort_v(
+        std::min({ gb_vec1->size(), gb_vec2->size(), gb_vec3->size() }), 0);
+
+    std::iota(sort_v.begin(), sort_v.end(), 0);
+    std::sort(sort_v.begin(), sort_v.end(),
+              [gb_vec1, gb_vec2, gb_vec3](std::size_t i,
+                                          std::size_t j) -> bool  {
+                  if (gb_vec1->at(i) < gb_vec1->at(j))
+                      return (true);
+                  else if (gb_vec1->at(i) > gb_vec1->at(j))
+                      return (false);
+                  else if (gb_vec2->at(i) < gb_vec2->at(j))
+                      return (true);
+                  else if (gb_vec2->at(i) > gb_vec2->at(j))
+                      return (false);
+                  return (gb_vec3->at(i) < gb_vec3->at(j));
+              });
+
+    DataFrame   res;
+    auto        args_tuple = std::tuple<Ts ...>(args ...);
+    auto        func =
+        [*this,
+         &res,
+         gb_vec1,
+         gb_vec2,
+         gb_vec3,
+         &sort_v,
+         idx_visitor = std::forward<I_V>(idx_visitor),
+         col_name1,
+         col_name2,
+         col_name3](auto &triple) mutable -> void {
+            _load_groupby_data_3_(*this,
+                                  res,
+                                  triple,
+                                  idx_visitor,
+                                  *gb_vec1,
+                                  *gb_vec2,
+                                  *gb_vec3,
+                                  sort_v,
+                                  col_name1,
+                                  col_name2,
+                                  col_name3);
+        };
+
+    for_each_in_tuple (args_tuple, func);
+
+    return (res);
 }
 
 // ----------------------------------------------------------------------------
 
 template<typename I, typename H>
-template<typename T1, typename T2, typename ... Ts>
+template<typename T, typename I_V, typename ... Ts>
+std::future<DataFrame<I, H>> DataFrame<I, H>::
+groupby1_async(const char *col_name, I_V &&idx_visitor, Ts&& ... args) const {
+
+    return (std::async(std::launch::async,
+                       &DataFrame::groupby1<T, I_V, Ts ...>,
+                           this,
+                           col_name,
+                           std::forward<I_V>(idx_visitor),
+                           std::forward<Ts>(args) ...));
+}
+
+// ----------------------------------------------------------------------------
+
+template<typename I, typename H>
+template<typename T1, typename T2, typename I_V, typename ... Ts>
 std::future<DataFrame<I, H>> DataFrame<I, H>::
 groupby2_async(const char *col_name1,
                const char *col_name2,
+               I_V &&idx_visitor,
                Ts&& ... args) const  {
 
     return (std::async(std::launch::async,
-                       &DataFrame::groupby2<T1, T2, Ts ...>,
+                       &DataFrame::groupby2<T1, T2, I_V, Ts ...>,
                            this,
                            col_name1,
                            col_name2,
-                           args ...));
+                           std::forward<I_V>(idx_visitor),
+                           std::forward<Ts>(args) ...));
+}
+
+// ----------------------------------------------------------------------------
+
+template<typename I, typename H>
+template<typename T1, typename T2, typename T3, typename I_V, typename ... Ts>
+std::future<DataFrame<I, H>> DataFrame<I, H>::
+groupby3_async(const char *col_name1,
+               const char *col_name2,
+               const char *col_name3,
+               I_V &&idx_visitor,
+               Ts&& ... args) const  {
+
+    return (std::async(std::launch::async,
+                       &DataFrame::groupby3<T1, T2, T3, I_V, Ts ...>,
+                           this,
+                           col_name1,
+                           col_name2,
+                           col_name3,
+                           std::forward<I_V>(idx_visitor),
+                           std::forward<Ts>(args) ...));
 }
 
 // ----------------------------------------------------------------------------
@@ -1272,16 +1431,33 @@ DataFrame<I, H>::value_counts (const char *col_name) const  {
 // ----------------------------------------------------------------------------
 
 template<typename I, typename H>
-template<typename ... Ts>
-DataFrame<I, H>
-DataFrame<I, H>::bucketize(const IndexType &interval, Ts&& ... args) const  {
+template<typename T>
+StdDataFrame<T> DataFrame<I, H>::value_counts(size_type index) const  {
 
-    DataFrame   result;
+    return (value_counts<T>(column_list_[index].first.c_str()));
+}
+
+// ----------------------------------------------------------------------------
+
+template<typename I, typename H>
+template<typename V, typename I_V, typename ... Ts>
+DataFrame<I, H> DataFrame<I, H>::
+bucketize(bucket_type bt,
+          const V &value,
+          I_V &&idx_visitor,
+          Ts&& ... args) const  {
+
+    DataFrame       result;
+    auto            &dst_idx = result.get_index();
+    const auto      &src_idx = get_index();
+    const size_type idx_s = src_idx.size();
+
+    _bucketize_core_(dst_idx, src_idx, src_idx, value, idx_visitor, idx_s, bt);
 
     auto    args_tuple = std::tuple<Ts ...>(args ...);
     auto    func =
-        [this, &result, &interval](auto &triple) mutable -> void {
-            _load_bucket_data_(*this, result, interval, triple);
+        [this, &result, &value, bt](auto &triple) mutable -> void {
+            _load_bucket_data_(*this, result, value, bt, triple);
         };
 
     for_each_in_tuple (args_tuple, func);
@@ -1292,16 +1468,21 @@ DataFrame<I, H>::bucketize(const IndexType &interval, Ts&& ... args) const  {
 // ----------------------------------------------------------------------------
 
 template<typename I, typename H>
-template<typename ... Ts>
+template<typename V, typename I_V, typename ... Ts>
 std::future<DataFrame<I, H>>
 DataFrame<I, H>::
-bucketize_async (const IndexType &bucket_interval, Ts&& ... args) const  {
+bucketize_async(bucket_type bt,
+                const V &value,
+                I_V &&idx_visitor,
+                Ts&& ... args) const  {
 
     return (std::async(std::launch::async,
-                       &DataFrame::bucketize<Ts ...>,
+                       &DataFrame::bucketize<V, I_V, Ts ...>,
                            this,
-                           std::cref(bucket_interval),
-                           args ...));
+                           bt,
+                           std::cref(value),
+                           std::forward<I_V>(idx_visitor),
+                           std::forward<Ts>(args) ...));
 }
 
 // ----------------------------------------------------------------------------

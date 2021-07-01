@@ -29,6 +29,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #pragma once
 
+#include <DataFrame/Utils/DateTime.h>
+
+#include <cstring>
+#include <iostream>
 #include <tuple>
 #include <utility>
 
@@ -48,11 +52,12 @@ _create_column_from_triple_(DF &df, T &triple) {
 
 // ----------------------------------------------------------------------------
 
-template<typename DF, typename T, typename V>
+template<typename DF, typename T, typename I_V, typename V>
 static inline void
 _load_groupby_data_1_(const DF &source,
                       DF &dest,
                       T &triple,
+                      I_V &&idx_visitor,
                       const V &input_v,
                       const std::vector<std::size_t> &sort_v,
                       const char *col_name) {
@@ -74,13 +79,21 @@ _load_groupby_data_1_(const DF &source,
         if (col_vec)  col_vec->reserve(vec_size / 2 + 1);
         for (std::size_t i = 0; i < vec_size; ++i)  {
             if (input_v[sort_v[i]] != input_v[sort_v[marker]])  {
-                dst_idx.push_back(src_idx[sort_v[i - 1]]);
+                idx_visitor.pre();
+                for (std::size_t j = marker; j < i; ++j)
+                    idx_visitor(src_idx[sort_v[j]], src_idx[sort_v[j]]);
+                idx_visitor.post();
+                dst_idx.push_back(idx_visitor.get_result());
                 if (col_vec)  col_vec->push_back(input_v[sort_v[i - 1]]);
                 marker = i;
             }
         }
         if (marker < vec_size - 1)  {
-            dst_idx.push_back(src_idx[sort_v[vec_size - 1]]);
+            idx_visitor.pre();
+            for (std::size_t j = marker; j < vec_size; ++j)
+                idx_visitor(src_idx[sort_v[j]], src_idx[sort_v[j]]);
+            idx_visitor.post();
+            dst_idx.push_back(idx_visitor.get_result());
             if (col_vec)  col_vec->push_back(input_v[sort_v[vec_size - 1]]);
         }
     }
@@ -116,11 +129,12 @@ _load_groupby_data_1_(const DF &source,
 
 // ----------------------------------------------------------------------------
 
-template<typename DF, typename T, typename V1, typename V2>
+template<typename DF, typename T, typename I_V, typename V1, typename V2>
 static inline void
 _load_groupby_data_2_(const DF &source,
                       DF &dest,
                       T &triple,
+                      I_V &&idx_visitor,
                       const V1 &input_v1,
                       const V2 &input_v2,
                       const std::vector<std::size_t> &sort_v,
@@ -151,14 +165,22 @@ _load_groupby_data_2_(const DF &source,
         for (std::size_t i = 0; i < vec_size; ++i)  {
             if (input_v1[sort_v[i]] != input_v1[sort_v[marker]] ||
                 input_v2[sort_v[i]] != input_v2[sort_v[marker]])  {
-                dst_idx.push_back(src_idx[sort_v[i - 1]]);
+                idx_visitor.pre();
+                for (std::size_t j = marker; j < i; ++j)
+                    idx_visitor(src_idx[sort_v[j]], src_idx[sort_v[j]]);
+                idx_visitor.post();
+                dst_idx.push_back(idx_visitor.get_result());
                 if (col_vec1) col_vec1->push_back(input_v1[sort_v[i - 1]]);
                 if (col_vec2) col_vec2->push_back(input_v2[sort_v[i - 1]]);
                 marker = i;
             }
         }
         if (marker < vec_size - 1)  {
-            dst_idx.push_back(src_idx[sort_v[vec_size - 1]]);
+            idx_visitor.pre();
+            for (std::size_t j = marker; j < vec_size; ++j)
+                idx_visitor(src_idx[sort_v[j]], src_idx[sort_v[j]]);
+            idx_visitor.post();
+            dst_idx.push_back(idx_visitor.get_result());
             if (col_vec1) col_vec1->push_back(input_v1[sort_v[vec_size - 1]]);
             if (col_vec2) col_vec2->push_back(input_v2[sort_v[vec_size - 1]]);
         }
@@ -196,23 +218,73 @@ _load_groupby_data_2_(const DF &source,
 
 // ----------------------------------------------------------------------------
 
-template<typename DF, typename I, typename T>
+template<typename DF, typename T, typename I_V,
+         typename V1, typename V2, typename V3>
 static inline void
-_load_bucket_data_(const DF &source, DF &dest, const I &interval, T &triple) {
+_load_groupby_data_3_(const DF &source,
+                      DF &dest,
+                      T &triple,
+                      I_V &&idx_visitor,
+                      const V1 &input_v1,
+                      const V2 &input_v2,
+                      const V3 &input_v3,
+                      const std::vector<std::size_t> &sort_v,
+                      const char *col_name1,
+                      const char *col_name2,
+                      const char *col_name3) {
 
-    std::size_t marker = 0;
-    auto        &dst_idx = dest.get_index();
-    const auto  &src_idx = source.get_index();
+    std::size_t         marker = 0;
+    auto                &dst_idx = dest.get_index();
+    const std::size_t   vec_size =
+        std::min({ input_v1.size(), input_v2.size(), input_v3.size() });
+    const auto          &src_idx = source.get_index();
 
     if (dst_idx.empty())  {
-        const std::size_t   idx_s = src_idx.size();
+        using ColValueType1 = typename V1::value_type;
+        using ColValueType2 = typename V2::value_type;
+        using ColValueType3 = typename V3::value_type;
 
-        dst_idx.reserve(idx_s / interval + 1);
-        for (std::size_t i = 0; i < idx_s; ++i)  {
-            if (src_idx[i] - src_idx[marker] >= interval)  {
-                dst_idx.push_back(src_idx[i - 1]);
+        auto    *col_vec1 =
+            ::strcmp(col_name1, DF_INDEX_COL_NAME)
+                ? &(dest.template create_column<ColValueType1>(col_name1))
+                : nullptr;
+        auto    *col_vec2 =
+            ::strcmp(col_name2, DF_INDEX_COL_NAME)
+                ? &(dest.template create_column<ColValueType2>(col_name2))
+                : nullptr;
+        auto    *col_vec3 =
+            ::strcmp(col_name3, DF_INDEX_COL_NAME)
+                ? &(dest.template create_column<ColValueType3>(col_name3))
+                : nullptr;
+
+        dst_idx.reserve(vec_size / 2 + 1);
+        if (col_vec1) col_vec1->reserve(vec_size / 2 + 1);
+        if (col_vec2) col_vec2->reserve(vec_size / 2 + 1);
+        if (col_vec3) col_vec3->reserve(vec_size / 2 + 1);
+        for (std::size_t i = 0; i < vec_size; ++i)  {
+            if (input_v1[sort_v[i]] != input_v1[sort_v[marker]] ||
+                input_v2[sort_v[i]] != input_v2[sort_v[marker]] ||
+                input_v3[sort_v[i]] != input_v3[sort_v[marker]])  {
+                idx_visitor.pre();
+                for (std::size_t j = marker; j < i; ++j)
+                    idx_visitor(src_idx[sort_v[j]], src_idx[sort_v[j]]);
+                idx_visitor.post();
+                dst_idx.push_back(idx_visitor.get_result());
+                if (col_vec1) col_vec1->push_back(input_v1[sort_v[i - 1]]);
+                if (col_vec2) col_vec2->push_back(input_v2[sort_v[i - 1]]);
+                if (col_vec3) col_vec3->push_back(input_v3[sort_v[i - 1]]);
                 marker = i;
             }
+        }
+        if (marker < vec_size - 1)  {
+            idx_visitor.pre();
+            for (std::size_t j = marker; j < vec_size; ++j)
+                idx_visitor(src_idx[sort_v[j]], src_idx[sort_v[j]]);
+            idx_visitor.post();
+            dst_idx.push_back(idx_visitor.get_result());
+            if (col_vec1) col_vec1->push_back(input_v1[sort_v[vec_size - 1]]);
+            if (col_vec2) col_vec2->push_back(input_v2[sort_v[vec_size - 1]]);
+            if (col_vec3) col_vec3->push_back(input_v3[sort_v[vec_size - 1]]);
         }
     }
 
@@ -220,21 +292,93 @@ _load_bucket_data_(const DF &source, DF &dest, const I &interval, T &triple) {
 
     const auto          &src_vec =
         source.template get_column<ValueType>(std::get<0>(triple));
+    const std::size_t   max_count = std::min(vec_size, src_vec.size());
     auto                &dst_vec = _create_column_from_triple_(dest, triple);
-    const std::size_t   src_vec_size = src_vec.size();
     auto                &visitor = std::get<2>(triple);
 
-    dst_vec.reserve(src_vec_size / interval + 1);
-    visitor.pre();
-    for (std::size_t i = 0, marker = 0; i < src_vec_size; ++i)  {
-        if (src_idx[i] - src_idx[marker] >= interval)  {
+    dst_vec.reserve(max_count / 2 + 1);
+    marker = 0;
+    for (std::size_t i = 0; i < max_count; ++i)  {
+        if (input_v1[sort_v[i]] != input_v1[sort_v[marker]] ||
+            input_v2[sort_v[i]] != input_v2[sort_v[marker]] ||
+            input_v3[sort_v[i]] != input_v3[sort_v[marker]])  {
+            visitor.pre();
+            for (std::size_t j = marker; j < i; ++j)
+                visitor(src_idx[sort_v[j]], src_vec[sort_v[j]]);
             visitor.post();
             dst_vec.push_back(visitor.get_result());
-            visitor.pre();
             marker = i;
         }
-        visitor(src_idx[i], src_vec[i]);
     }
+    if (marker < max_count)  {
+        visitor.pre();
+        for (std::size_t j = marker; j < max_count; ++j)
+            visitor(src_idx[sort_v[j]], src_vec[sort_v[j]]);
+        visitor.post();
+        dst_vec.push_back(visitor.get_result());
+    }
+}
+
+// ----------------------------------------------------------------------------
+
+template<typename DV, typename SI, typename SV, typename V, typename VIS>
+static inline void
+_bucketize_core_(DV &dst_vec,
+                 const SI &src_idx,
+                 const SV &src_vec,
+                 const V &value,
+                 VIS &visitor,
+                 std::size_t src_s,
+                 bucket_type bt)  {
+
+    dst_vec.reserve(src_s / 5);
+    if (bt == bucket_type::by_distance)  {
+        std::size_t marker { 0 };
+
+        visitor.pre();
+        for (std::size_t i = 0; i < src_s; ++i)  {
+            if (src_idx[i] - src_idx[marker] >= value)  {
+                visitor.post();
+                dst_vec.push_back(visitor.get_result());
+                visitor.pre();
+                marker = i;
+            }
+            visitor(src_idx[i], src_vec[i]);
+        }
+    }
+    else if (bt == bucket_type::by_count)  {
+        if (src_s < value)  return;
+
+        for (std::size_t i = 0; (i + value) < src_s; i += value)  {
+            visitor.pre();
+            for (std::size_t j = 0; j < value; ++j)
+                visitor(src_idx[i + j], src_vec[i + j]);
+            visitor.post();
+            dst_vec.push_back(visitor.get_result());
+        }
+    }
+}
+
+// ----------------------------------------------------------------------------
+
+template<typename DF, typename I, typename T>
+static inline void
+_load_bucket_data_(const DF &source,
+                   DF &dest,
+                   const I &value,
+                   bucket_type bt,
+                   T &triple) {
+
+    using ValueType = typename std::tuple_element<2, T>::type::value_type;
+
+    const auto          &src_idx = source.get_index();
+    const auto          &src_vec =
+        source.template get_column<ValueType>(std::get<0>(triple));
+    auto                &dst_vec = _create_column_from_triple_(dest, triple);
+    const std::size_t   src_s = std::min(src_vec.size(), src_idx.size());
+    auto                &visitor = std::get<2>(triple);
+
+    _bucketize_core_(dst_vec, src_idx, src_vec, value, visitor, src_s, bt);
 }
 
 // ----------------------------------------------------------------------------
@@ -472,11 +616,11 @@ _col_vector_push_back_<DateTime, std::vector<DateTime>>(
         int         n;
         DateTime    dt;
 
-#ifdef _WIN32
+#ifdef _MSC_VER
         ::sscanf(value, "%lld.%d", &t, &n);
 #else
         ::sscanf(value, "%ld.%d", &t, &n);
-#endif // _WIN32
+#endif // _MSC_VER
         dt.set_time(t, n);
         vec.emplace_back(std::move(dt));
     }
@@ -747,43 +891,62 @@ _generate_ts_index_<DateTime>(std::vector<DateTime> &index_vec,
 
 template<typename S, typename T>
 inline static S &
-_write_csv2_df_header_(S &o,
-                       const char *col_name,
-                       std::size_t col_size,
-                       char last_delimit)  {
+_write_csv_df_header_base_(S &o, const char *col_name, std::size_t col_size)  {
 
     o << col_name << ':' << col_size << ':';
 
     if (typeid(T) == typeid(float))
-        o << "<float>" << last_delimit;
+        o << "<float>";
     else if (typeid(T) == typeid(double))
-        o << "<double>" << last_delimit;
+        o << "<double>";
     else if (typeid(T) == typeid(long double))
-        o << "<longdouble>" << last_delimit;
+        o << "<longdouble>";
     else if (typeid(T) == typeid(short int))
-        o << "<short>" << last_delimit;
+        o << "<short>";
     else if (typeid(T) == typeid(unsigned short int))
-        o << "<ushort>" << last_delimit;
+        o << "<ushort>";
     else if (typeid(T) == typeid(int))
-        o << "<int>" << last_delimit;
+        o << "<int>";
     else if (typeid(T) == typeid(unsigned int))
-        o << "<uint>" << last_delimit;
+        o << "<uint>";
     else if (typeid(T) == typeid(long int))
-        o << "<long>" << last_delimit;
+        o << "<long>";
     else if (typeid(T) == typeid(long long int))
-        o << "<longlong>" << last_delimit;
+        o << "<longlong>";
     else if (typeid(T) == typeid(unsigned long int))
-        o << "<ulong>" << last_delimit;
+        o << "<ulong>";
     else if (typeid(T) == typeid(unsigned long long int))
-        o << "<ulonglong>" << last_delimit;
+        o << "<ulonglong>";
     else if (typeid(T) == typeid(std::string))
-        o << "<string>" << last_delimit;
+        o << "<string>";
     else if (typeid(T) == typeid(bool))
-        o << "<bool>" << last_delimit;
-    else if (typeid(T) == typeid(DateTime))
-        o << "<DateTime>" << last_delimit;
-    else
-        o << "<N/A>" << last_delimit;
+        o << "<bool>";
+    return (o);
+}
+
+// ----------------------------------------------------------------------------
+
+template<typename S, typename T>
+inline static S &
+_write_csv_df_header_(S &o, const char *col_name, std::size_t col_size)  {
+
+    _write_csv_df_header_base_<S, T>(o, col_name, col_size);
+
+    if (typeid(T) == typeid(DateTime))
+        o << "<DateTime>";
+    return (o << ':');
+}
+
+// ----------------------------------------------------------------------------
+
+template<typename S, typename T>
+inline static S &
+_write_csv2_df_header_(S &o, const char *col_name, std::size_t col_size)  {
+
+    _write_csv_df_header_base_<S, T>(o, col_name, col_size);
+
+    if (typeid(T) == typeid(DateTime))
+        o << "<DateTimeAME>";
     return (o);
 }
 
@@ -926,7 +1089,6 @@ struct  hash<std::tuple<TT ...>>  {
         return (seed);
     }
 };
-
 
 // ----------------------------------------------------------------------------
 

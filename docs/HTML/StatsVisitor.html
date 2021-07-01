@@ -34,15 +34,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       <td bgcolor="maroon"> <font color="white">
         <PRE><B>#include &lt;DataFrame/DataFrameStatsVisitors.h&gt;
 
-template&lt;typename T,
-         typename I = unsigned long,
-         typename =
-             typename std::enable_if&lt;std::is_arithmetic&lt;T&gt;::value, T&gt;::type&gt;
+template&lt;typename T, typename I = unsigned long&gt;
 struct StatsVisitor;
         </B></PRE></font>
       </td>
       <td>
-        This functor class calculates the following statistics of a given column; mean, variance, standard deviation, skew, and kurtosis. See this document and dataframe_tester.cc for examples.
+        This functor class calculates the following statistics of a given column; mean, variance, standard deviation, skew, and kurtosis.
       </td>
       <td width="12%">
         <B>T</B>: Column data type.<BR>

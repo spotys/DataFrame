@@ -53,7 +53,7 @@ namespace hmdf
 // Fixed size priority queue. By default, it is a max heap
 //
 template <typename T, std::size_t N, typename Cmp = std::less<T>>
-class LIBRARY_API FixedSizePriorityQueue  {
+class LIBRARY_API   FixedSizePriorityQueue  {
 
     using container_type = std::array<T, N>;
     using iterator = typename container_type::iterator;
@@ -65,7 +65,7 @@ public:
     using compare_type = Cmp;
     using size_type = std::size_t;
 
-    void push(value_type item)  {
+    void push(value_type &&item)  {
 
         if (data_end_ != array_.end())  {
             *data_end_++ = std::move(item);

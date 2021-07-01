@@ -29,6 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #pragma once
 
+#include <DataFrame/DataFrameStatsVisitors.h>
 #include <DataFrame/DataFrameTypes.h>
 #include <DataFrame/Utils/DateTime.h>
 #include <DataFrame/Utils/FixedSizeString.h>
@@ -36,9 +37,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <DataFrame/Utils/Utils.h>
 
 #include <array>
-#include <fstream>
 #include <functional>
 #include <future>
+#include <iostream>
 #include <map>
 #include <tuple>
 #include <typeindex>
@@ -51,9 +52,9 @@ namespace hmdf
 // I: Index (e.g. Timestamp) type. Although an index column need not
 //    necessarily represent time, it could be any built-in or user-defined type
 // H: See the static assert below. It can only be either
-//    a HeteroVector (typedef'ed below to StdDataFrame) or
-//    a HeteroView (typedef'ed below to DataFrameView) or
-//    a HeteroPtrView (typedef'ed below to DataFramePtrView)
+//    a HeteroVector (typedef'ed to StdDataFrame) or
+//    a HeteroView (typedef'ed to DataFrameView) or
+//    a HeteroPtrView (typedef'ed to DataFramePtrView)
 //
 // A DataFrame may contain one index and any number of columns of any built-in
 // or user-defined types
@@ -71,10 +72,7 @@ class LIBRARY_API DataFrame : public ThreadGranularity {
     using DataVec = H;
     using DataVecVec = std::vector<DataVec>;
 
-    template<typename II, typename HH>
-    friend class DataFrame;
-
-public:
+ public:  // Construction
 
     using size_type = typename std::vector<DataVec>::size_type;
     using IndexType = I;
@@ -94,25 +92,6 @@ public:
     //
     ~DataFrame();
 
-private:
-
-    using ColNameDict =
-        std::unordered_map<ColNameType, size_type, std::hash<VirtualString>>;
-    using ColNameList = std::vector<std::pair<ColNameType, size_type>>;
-
-    // Data fields
-    //
-    DataVecVec      data_ { };       // Vector of Heterogeneous vectors
-    IndexVecType    indices_ { };    // Vector
-    ColNameDict     column_tb_ { };  // Hash table of name -> vector index
-
-    // This is necessary to have a deterministic column order across all
-    // implementations
-    //
-    ColNameList     column_list_ { };  // Vector of column names and indices
-
-    inline static SpinLock *lock_ { nullptr };  // No lock safety by default
-
 public:  // Load/append/remove interfaces
 
     // DataFrame has unprotected static data. If you are using DataFrame in a
@@ -120,8 +99,11 @@ public:  // Load/append/remove interfaces
     // your SpinLock to protect its static data.
     // This is done this way, so by default, there is no locking overhead.
     //
-    static void set_lock (SpinLock *sl)  { lock_ = sl; }
-    static void remove_lock ()  { lock_ = nullptr; }
+    static void
+    set_lock (SpinLock *sl);
+
+    static void
+    remove_lock ();
 
     // It creates an empty column named name
     //
@@ -140,10 +122,7 @@ public:  // Load/append/remove interfaces
     remove_column(const char *name);
 
     void
-    remove_column(size_type index)  {
-
-        return (remove_column(column_list_[index].first.c_str()));
-    }
+    remove_column(size_type index);
 
     // It renames column named from to to. If column from does not exist,
     // it throws an exception
@@ -728,6 +707,30 @@ public:  // Data manipulation
                  const std::array<T, N> values = { },
                  int limit = -1);
 
+    // It fills the missing values in all columns in self by investigating the
+    // rhs DataFrame. It attempts to find columns with the same name and type
+    // in rhs. If there are such columns in rhs, it fills the missing values
+    // in the corresponding columns in self that also have the same index value.
+    //
+    // NOTE: This means that self and rhs must be aligned/ordered the same way
+    //       for all common columns including index column. Otherwise, the
+    //       result is either nonsense (or not applied, if index column is in a
+    //       different order).
+    // NOTE: Self and rhs must have the same type index. The == operator must
+    //       be well defined on the index type
+    // NOTE: This method does not extend any of the columns in self. It just
+    //       fills the holes, if data is present in rhs.
+    //
+    // Ts:
+    //   List all the types of all data columns. A type should be specified in
+    //   the list only once.
+    // rhs:
+    //   DataFrame to be used to find the missing values in self
+    //
+    template<typename DF, typename ... Ts>
+    void
+    fill_missing(const DF &rhs);
+
     // It removes a row if any or all or some of the columns are NaN, based
     // on drop policy
     //
@@ -747,9 +750,9 @@ public:  // Data manipulation
     // limit. If limit is omitted, all values will be replaced.
     // It returns number of items replaced.
     //
-    // T:
-    //   Type on column col_name. If this is index it would be the same as
-    //   IndexType.
+    // Ts:
+    //   List all the types of all data columns. A type should be specified in
+    //   the list only once.
     // N:
     //   Size of old_values and new_values arrays
     // col_name:
@@ -957,10 +960,8 @@ public:  // Data manipulation
     //    2. Column name for the new bucketized DataFrame
     //    3. A visitor to aggregate current column to new column
     //
-    // The index column is never summarized in the returned DataFrame. If the
-    // named column is not the index column, than the index of the returned
-    // DataFrame is the last index items of the original DataFrame for the
-    // named column.
+    // You must also specify how the index column is summarized, by providing
+    // a visitor.
     // If the named column is other than index column, then the returned
     // DataFrame also has a column with the same name which has the unique
     // values of the named column.
@@ -968,16 +969,20 @@ public:  // Data manipulation
     //
     // T:
     //   Type of groupby column. In case if index, it is type of index
+    // I_V:
+    //   Type of visitor to be used to summarize the index column
     // Ts:
     //   Types of triples to specify the column summarization
     // col_name:
     //   Name of the grouop-by'ing column
+    // idx_visitor:
+    //   A visitor to specify the index summarization
     // args:
     //   List of triples to specify the column summarization
     //
-    template<typename T, typename ... Ts>
+    template<typename T, typename I_V, typename ... Ts>
     [[nodiscard]] DataFrame
-    groupby1(const char *col_name, Ts&& ... args) const;
+    groupby1(const char *col_name, I_V &&idx_visitor, Ts&& ... args) const;
 
     // This is the same as above groupby1() but it groups by two columns
     //
@@ -985,31 +990,84 @@ public:  // Data manipulation
     //   Type of first groupby column. In case if index, it is type of index
     // T2:
     //   Type of second groupby column. In case if index, it is type of index
+    // I_V:
+    //   Type of visitor to be used to summarize the index column
     // Ts:
     //   Types of triples to specify the column summarization
     // col_name1:
     //   Name of the first grouop-by'ing column
     // col_name2:
     //   Name of the second grouop-by'ing column
+    // idx_visitor:
+    //   A visitor to specify the index summarization
     // args:
     //   List of triples to specify the column summarization
     //
-    template<typename T1, typename T2, typename ... Ts>
+    template<typename T1, typename T2, typename I_V, typename ... Ts>
     [[nodiscard]] DataFrame
-    groupby2(const char *col_name1, const char *col_name2, Ts&& ... args) const;
+    groupby2(const char *col_name1,
+             const char *col_name2,
+             I_V &&idx_visitor,
+             Ts&& ... args) const;
+
+    // This is the same as above groupby2() but it groups by three columns
+    //
+    // T1:
+    //   Type of first groupby column. In case if index, it is type of index
+    // T2:
+    //   Type of second groupby column. In case if index, it is type of index
+    // T3:
+    //   Type of third groupby column. In case if index, it is type of index
+    // I_V:
+    //   Type of visitor to be used to summarize the index column
+    // Ts:
+    //   Types of triples to specify the column summarization
+    // col_name1:
+    //   Name of the first grouop-by'ing column
+    // col_name2:
+    //   Name of the second grouop-by'ing column
+    // col_name3:
+    //   Name of the third grouop-by'ing column
+    // idx_visitor:
+    //   A visitor to specify the index summarization
+    // args:
+    //   List of triples to specify the column summarization
+    //
+    template<typename T1, typename T2, typename T3,
+             typename I_V, typename ... Ts>
+    [[nodiscard]] DataFrame
+    groupby3(const char *col_name1,
+             const char *col_name2,
+             const char *col_name3,
+             I_V &&idx_visitor,
+             Ts&& ... args) const;
 
     // Same as groupby1() above, but executed asynchronously
     //
-    template<typename T, typename ... Ts>
+    template<typename T, typename I_V, typename ... Ts>
     [[nodiscard]] std::future<DataFrame>
-    groupby1_async(const char *col_name, Ts&& ... args) const;
+    groupby1_async(const char *col_name,
+                   I_V &&idx_visitor,
+                   Ts&& ... args) const;
 
     // Same as groupby2() above, but executed asynchronously
     //
-    template<typename T1, typename T2, typename ... Ts>
+    template<typename T1, typename T2, typename I_V, typename ... Ts>
     [[nodiscard]] std::future<DataFrame>
     groupby2_async(const char *col_name1,
                    const char *col_name2,
+                   I_V &&idx_visitor,
+                   Ts&& ... args) const;
+
+    // Same as groupby3() above, but executed asynchronously
+    //
+    template<typename T1, typename T2, typename T3,
+             typename I_V, typename ... Ts>
+    [[nodiscard]] std::future<DataFrame>
+    groupby3_async(const char *col_name1,
+                   const char *col_name2,
+                   const char *col_name3,
+                   I_V &&idx_visitor,
                    Ts&& ... args) const;
 
     // It counts the unique values in the named column.
@@ -1037,45 +1095,56 @@ public:  // Data manipulation
 
     template<typename T>
     [[nodiscard]] StdDataFrame<T>
-    value_counts(size_type index) const  {
+    value_counts(size_type index) const;
 
-        return (value_counts<T>(column_list_[index].first.c_str()));
-    }
-
-    // It bucketizes the data and index into bucket_interval's,
-    // based on index values.
-    // You must specify how each column is bucketized by providing 3-member
-    // tuples (triples). Each triple has the format:
+    // It bucketizes the data and index into intervals, based on index values
+    // and bucket_type.
+    // You must specify how the index column is bucketized, by providing
+    // a visitor.
+    // You must specify how each column is bucketized, by providing 3-member
+    // tuples (triples). Each triple must have the following members:
     //    1. Current DataFrame column name
     //    2. Column name for the new bucketized DataFrame
     //    3. A visitor to aggregate/bucketize current column to new column
     //
     // The result of each bucket will be stored in a new DataFrame and returned.
-    // Every data bucket is guaranteed to be as wide as bucket_interval.
-    // This means some data items at the end may not be included in the
-    // new bucketized DataFrame.
-    // The index of each bucket will be the last index in the original
-    // DataFrame that is less than bucket_interval away from the
-    // previous bucket
+    // Some data at the end of source columns may not be included in the result
+    // columns, because based on bucket_type they may not fit into the bucket.
+    // The index of each bucket will be determined by idx_visitor.
     //
-    // NOTE: The DataFrame must already be sorted by index.
-    //
-    // bucket_interval:
-    //   Bucket interval is in the index's single value unit. For example if
-    //   index is in minutes, bucket_interval will be in the unit of minutes
-    //   and so on.
+    // V:
+    //   Type of value to be uased for bucketizing based on bucket_type
+    // I_V:
+    //   Type of visitor to be used to bucketize the index column
+    // Ts:
+    //   Types of triples to specify each column's bucketization
+    // bt:
+    //   bucket_type to specify bucketization logic
+    // value:
+    //   The value to be uased to bucketize based on bucket_type. For example,
+    //   if bucket_type is by_distance, then value is the distance between two
+    //   index values. If bucket_type is by_count, then value is an integer
+    //   count.
+    // idx_visitor:
+    //   A visitor to specify the index bucketization
     // args:
     //   Variable argument list of triples as specified above
     //
-    template<typename ... Ts>
+    template<typename V, typename I_V, typename ... Ts>
     [[nodiscard]] DataFrame
-    bucketize(const IndexType &bucket_interval, Ts&& ... args) const;
+    bucketize(bucket_type bt,
+              const V &value,
+              I_V &&idx_visitor,
+              Ts&& ... args) const;
 
     // Same as bucketize() above, but executed asynchronously
     //
-    template<typename ... Ts>
+    template<typename V, typename I_V, typename ... Ts>
     [[nodiscard]] std::future<DataFrame>
-    bucketize_async(const IndexType &bucket_interval, Ts&& ... args) const;
+    bucketize_async(bucket_type bt,
+                    const V &value,
+                    I_V &&idx_visitor,
+                    Ts&& ... args) const;
 
     // It transposes the data in the DataFrame.
     // The transpose() is only defined for DataFrame's that have a single
@@ -1272,10 +1341,15 @@ public:  // Data manipulation
 
 public: // Read/access and slicing interfaces
 
+    // Returns true, if there is no data in DataFrame
+    //
     [[nodiscard]] bool
-    empty() const noexcept  { return (indices_.empty()); }
+    empty() const noexcept;
+
+    // Returns true, if there is no column created in the DataFrame
+    //
     [[nodiscard]] bool
-    shapeless() const noexcept  { return (empty() && column_list_.empty()); }
+    shapeless() const noexcept;
 
     // It returns a reference to the container of named data column
     // The return type depends on if we are in standard or view mode
@@ -1289,10 +1363,7 @@ public: // Read/access and slicing interfaces
 
     template<typename T>
     [[nodiscard]] ColumnVecType<T> &
-    get_column(size_type index)  {
-
-        return (get_column<T>(column_list_[index].first.c_str()));
-    }
+    get_column(size_type index);
 
     // It returns a const reference to the container of named data column
     // The return type depends on if we are in standard or view mode
@@ -1308,10 +1379,7 @@ public: // Read/access and slicing interfaces
 
     template<typename T>
     [[nodiscard]] const ColumnVecType<T> &
-    get_column(size_type index) const  {
-
-        return (get_column<T>(column_list_[index].first.c_str()));
-    }
+    get_column(size_type index) const;
 
     // Returns true if self has the named column, otherwise false
     // NOTE: Even if the column exists, it may not be of the type you expect.
@@ -1323,7 +1391,7 @@ public: // Read/access and slicing interfaces
     has_column(const char *name) const;
 
     [[nodiscard]] bool
-    has_column(size_type index) const { return (index < column_list_.size()); }
+    has_column(size_type index) const;
 
     // This method returns true if the given column follows the given pattern,
     // otherwise it returns false. Epsilon is used for approximation.
@@ -1770,12 +1838,12 @@ public: // Read/access and slicing interfaces
     // It returns a const reference to the index container
     //
     [[nodiscard]] const IndexVecType &
-    get_index() const  { return (indices_); }
+    get_index() const;
 
     // It returns a reference to the index container
     //
     [[nodiscard]] IndexVecType &
-    get_index()  { return (indices_); }
+    get_index();
 
     // It creates and returns a new DataFrame which has the col_to_be_index
     // column as the index. If old_index_name is not null, it will be loaded
@@ -2170,10 +2238,7 @@ public:  // Visitors
 
     template<typename ... Ts>
     void
-    multi_visit(Ts ... args) const  {
-
-        const_cast<DataFrame *>(this)->multi_visit<Ts ...>(args ...);
-    }
+    multi_visit(Ts ... args) const;
 
     // It passes the values of each index and each named column to the
     // functor visitor sequentially from beginning to end
@@ -2197,11 +2262,7 @@ public:  // Visitors
 
     template<typename T, typename V>
     V &
-    visit(const char *name, V &visitor, bool in_reverse = false) const  {
-
-        return (const_cast<DataFrame *>(this)->visit<T, V>
-                (name, visitor, in_reverse));
-    }
+    visit(const char *name, V &visitor, bool in_reverse = false) const;
 
     // These are identical to above visit() but could execute asynchronously.
     // NOTE: It should be safe to run multiple visits on different columns
@@ -2246,11 +2307,7 @@ public:  // Visitors
     template<typename T1, typename T2, typename V>
     V &
     visit(const char *name1, const char *name2, V &visitor,
-          bool in_reverse = false) const  {
-
-        return (const_cast<DataFrame *>(this)->visit<T1, T2, V>
-                (name1, name2, visitor, in_reverse));
-    }
+          bool in_reverse = false) const;
 
     // These are identical to above visit() but could execute asynchronously.
     // NOTE: It should be safe to run multiple visits on different columns
@@ -2304,11 +2361,7 @@ public:  // Visitors
           const char *name2,
           const char *name3,
           V &visitor,
-          bool in_reverse = false) const  {
-
-        return (const_cast<DataFrame *>(this)->visit<T1, T2, T3, V>
-                (name1, name2, name3, visitor, in_reverse));
-    }
+          bool in_reverse = false) const;
 
     // These are identical to above visit() but could execute asynchronously.
     // NOTE: It should be safe to run multiple visits on different columns
@@ -2377,11 +2430,7 @@ public:  // Visitors
           const char *name3,
           const char *name4,
           V &visitor,
-          bool in_reverse = false) const  {
-
-        return (const_cast<DataFrame *>(this)->visit<T1, T2, T3, T4, V>
-                (name1, name2, name3, name4, visitor, in_reverse));
-    }
+          bool in_reverse = false) const;
 
     // These are identical to above visit() but could execute asynchronously.
     // NOTE: It should be safe to run multiple visits on different columns
@@ -2460,11 +2509,7 @@ public:  // Visitors
           const char *name4,
           const char *name5,
           V &visitor,
-          bool in_reverse = false) const  {
-
-        return (const_cast<DataFrame *>(this)->visit<T1, T2, T3, T4, T5, V>
-                (name1, name2, name3, name4, name5, visitor, in_reverse));
-    }
+          bool in_reverse = false) const;
 
     // These are identical to above visit() but could execute asynchronously.
     // NOTE: It should be safe to run multiple visits on different columns
@@ -2519,11 +2564,7 @@ public:  // Visitors
     V &
     single_act_visit(const char *name,
                      V &visitor,
-                     bool in_reverse = false) const  {
-
-        return (const_cast<DataFrame *>(this)->single_act_visit<T, V>
-                (name, visitor, in_reverse));
-    }
+                     bool in_reverse = false) const;
 
     // These are identical to above single_act_visit() but could execute
     // asynchronously.
@@ -2578,11 +2619,7 @@ public:  // Visitors
     single_act_visit(const char *name1,
                      const char *name2,
                      V &visitor,
-                     bool in_reverse = false) const  {
-
-        return (const_cast<DataFrame *>(this)->single_act_visit<T1, T2, V>
-                (name1, name2, visitor, in_reverse));
-    }
+                     bool in_reverse = false) const;
 
     // These are identical to above single_act_visit() but could execute
     // asynchronously.
@@ -2645,11 +2682,7 @@ public:  // Visitors
                      const char *name2,
                      const char *name3,
                      V &visitor,
-                     bool in_reverse = false) const  {
-
-        return (const_cast<DataFrame *>(this)->single_act_visit<T1, T2, T3, V>
-                (name1, name2, name3, visitor, in_reverse));
-    }
+                     bool in_reverse = false) const;
 
     // These are identical to above single_act_visit() but could execute
     // asynchronously.
@@ -2720,12 +2753,7 @@ public:  // Visitors
                      const char *name3,
                      const char *name4,
                      V &visitor,
-                     bool in_reverse = false) const  {
-
-        return (
-            const_cast<DataFrame *>(this)->single_act_visit<T1, T2, T3, T4, V>
-                (name1, name2, name3, name4, visitor, in_reverse));
-    }
+                     bool in_reverse = false) const;
 
     // These are identical to above single_act_visit() but could execute
     // asynchronously.
@@ -3026,210 +3054,34 @@ public:  // Utilities and miscellaneous
     read_async(S &in_s, io_format iof = io_format::csv,
                bool columns_only = false);
 
-private:  // Friend Operators
+private:
 
-    template<typename DF, template<typename> class OPT, typename ... Ts>
-    friend DF
-    binary_operation(const DF &lhs, const DF &rhs);
+    template<typename II, typename HH>
+    friend class DataFrame;
 
-protected:
+    using ColNameDict =
+        std::unordered_map<ColNameType, size_type, std::hash<VirtualString>>;
+    using ColNameList = std::vector<std::pair<ColNameType, size_type>>;
 
-    template<typename T1, typename T2>
-    size_type
-    _load_pair(std::pair<T1, T2> &col_name_data);
+    // Data fields
+    //
+    DataVecVec      data_ { };       // Vector of Heterogeneous vectors
+    IndexVecType    indices_ { };    // Vector
+    ColNameDict     column_tb_ { };  // Hash table of name -> vector index
 
-private:  // Static helper functions
+    // This is necessary to have a deterministic column order across all
+    // implementations
+    //
+    ColNameList     column_list_ { };  // Vector of column names and indices
 
-    void read_json_(std::istream &file, bool columns_only);
-    void read_csv_(std::istream &file, bool columns_only);
-    void read_csv2_(std::istream &file, bool columns_only);
+    inline static SpinLock *lock_ { nullptr };  // No lock safety by default
 
-    template<typename CF, typename ... Ts>
-    static void
-    sort_common_(DataFrame<I, H> &df, CF &&comp_func);
-
-    template<typename T>
-    static void
-    fill_missing_value_(ColumnVecType<T> &vec,
-                        const T &value,
-                        int limit,
-                        size_type col_num);
-
-    template<typename T>
-    static void
-    fill_missing_ffill_(ColumnVecType<T> &vec, int limit, size_type col_num);
-
-    template<typename T,
-             typename std::enable_if<
-                 std::is_arithmetic<T>::value &&
-                 std::is_arithmetic<IndexType>::value>::type* = nullptr>
-    static void
-    fill_missing_midpoint_(ColumnVecType<T> &vec, int limit, size_type col_num);
-
-    template<typename T,
-             typename std::enable_if<
-                 ! std::is_arithmetic<T>::value ||
-                 ! std::is_arithmetic<IndexType>::value>::type* = nullptr>
-    static void
-    fill_missing_midpoint_(ColumnVecType<T> &vec, int limit, size_type col_num);
-
-    template<typename T>
-    static void
-    fill_missing_bfill_(ColumnVecType<T> &vec, int limit);
-
-    template<typename T,
-             typename std::enable_if<
-                 std::is_arithmetic<T>::value &&
-                 std::is_arithmetic<IndexType>::value>::type* = nullptr>
-    static void
-    fill_missing_linter_(ColumnVecType<T> &vec,
-                         const IndexVecType &index,
-                         int limit);
-
-    template<typename T,
-             typename std::enable_if<
-                 ! std::is_arithmetic<T>::value ||
-                 ! std::is_arithmetic<IndexType>::value>::type* = nullptr>
-    static void
-    fill_missing_linter_(ColumnVecType<T> &, const IndexVecType &, int);
-
-    // Maps row number -> number of missing column(s)
-    using DropRowMap = std::map<size_type, size_type>;
-
-    template<typename T>
-    static void
-    drop_missing_rows_(T &vec,
-                       const DropRowMap missing_row_map,
-                       drop_policy policy,
-                       size_type threshold,
-                       size_type col_num);
-
-    template<typename T, typename ITR>
-    void
-    setup_view_column_(const char *name, Index2D<ITR> range);
-
-    using IndexIdxVector = std::vector<std::tuple<size_type, size_type>>;
-    template<typename T>
-    using JoinSortingPair = std::pair<const T *, size_type>;
-
-    template<typename LHS_T, typename RHS_T, typename IDX_T, typename ... Ts>
-    static void
-    join_helper_common_(const LHS_T &lhs,
-                        const RHS_T &rhs,
-                        const IndexIdxVector &joined_index_idx,
-                        StdDataFrame<IDX_T> &result,
-                        const char *skip_col_name = nullptr);
-
-    template<typename LHS_T, typename RHS_T, typename ... Ts>
-    static StdDataFrame<IndexType>
-    index_join_helper_(const LHS_T &lhs,
-                       const RHS_T &rhs,
-                       const IndexIdxVector &joined_index_idx);
-
-    template<typename LHS_T, typename RHS_T, typename T, typename ... Ts>
-    static StdDataFrame<unsigned int>
-    column_join_helper_(const LHS_T &lhs,
-                        const RHS_T &rhs,
-                        const char *col_name,
-                        const IndexIdxVector &joined_index_idx);
-
-    template<typename T>
-    static IndexIdxVector
-    get_inner_index_idx_vector_(
-        const std::vector<JoinSortingPair<T>> &col_vec_lhs,
-        const std::vector<JoinSortingPair<T>> &col_vec_rhs);
-
-    template<typename LHS_T, typename RHS_T, typename ... Ts>
-    static StdDataFrame<IndexType>
-    index_inner_join_(
-        const LHS_T &lhs, const RHS_T &rhs,
-        const std::vector<JoinSortingPair<IndexType>> &col_vec_lhs,
-        const std::vector<JoinSortingPair<IndexType>> &col_vec_rhs);
-
-    template<typename LHS_T, typename RHS_T, typename T, typename ... Ts>
-    static StdDataFrame<unsigned int>
-    column_inner_join_(const LHS_T &lhs,
-                       const RHS_T &rhs,
-                       const char *col_name,
-                       const std::vector<JoinSortingPair<T>> &col_vec_lhs,
-                       const std::vector<JoinSortingPair<T>> &col_vec_rhs);
-
-    template<typename T>
-    static IndexIdxVector
-    get_left_index_idx_vector_(
-        const std::vector<JoinSortingPair<T>> &col_vec_lhs,
-        const std::vector<JoinSortingPair<T>> &col_vec_rhs);
-
-    template<typename LHS_T, typename RHS_T, typename ... Ts>
-    static StdDataFrame<IndexType>
-    index_left_join_(
-        const LHS_T &lhs, const RHS_T &rhs,
-        const std::vector<JoinSortingPair<IndexType>> &col_vec_lhs,
-        const std::vector<JoinSortingPair<IndexType>> &col_vec_rhs);
-
-    template<typename LHS_T, typename RHS_T, typename T, typename ... Ts>
-    static StdDataFrame<unsigned int>
-    column_left_join_(const LHS_T &lhs,
-                      const RHS_T &rhs,
-                      const char *col_name,
-                      const std::vector<JoinSortingPair<T>> &col_vec_lhs,
-                      const std::vector<JoinSortingPair<T>> &col_vec_rhs);
-
-    template<typename T>
-    static IndexIdxVector
-    get_right_index_idx_vector_(
-        const std::vector<JoinSortingPair<T>> &col_vec_lhs,
-        const std::vector<JoinSortingPair<T>> &col_vec_rhs);
-
-    template<typename LHS_T, typename RHS_T, typename ... Ts>
-    static StdDataFrame<IndexType>
-    index_right_join_(
-        const LHS_T &lhs, const RHS_T &rhs,
-        const std::vector<JoinSortingPair<IndexType>> &col_vec_lhs,
-        const std::vector<JoinSortingPair<IndexType>> &col_vec_rhs);
-
-    template<typename LHS_T, typename RHS_T, typename T, typename ... Ts>
-    static StdDataFrame<unsigned int>
-    column_right_join_(const LHS_T &lhs,
-                       const RHS_T &rhs,
-                       const char *col_name,
-                       const std::vector<JoinSortingPair<T>> &col_vec_lhs,
-                       const std::vector<JoinSortingPair<T>> &col_vec_rhs);
-
-    template<typename MAP, typename ... Ts>
-    static StdDataFrame<IndexType>
-    remove_dups_common_(const DataFrame &s_df,
-                        remove_dup_spec rds,
-                        const MAP &row_table,
-                        const IndexVecType &index);
-
-    template<typename LHS_T, typename RHS_T, typename ... Ts>
-    static void
-    concat_helper_(LHS_T &lhs, const RHS_T &rhs, bool add_new_columns);
-
-    template<typename T>
-    static IndexIdxVector
-    get_left_right_index_idx_vector_(
-        const std::vector<JoinSortingPair<T>> &col_vec_lhs,
-        const std::vector<JoinSortingPair<T>> &col_vec_rhs);
-
-    template<typename LHS_T, typename RHS_T, typename ... Ts>
-    static StdDataFrame<IndexType>
-    index_left_right_join_(
-        const LHS_T &lhs, const RHS_T &rhs,
-        const std::vector<JoinSortingPair<IndexType>> &col_vec_lhs,
-        const std::vector<JoinSortingPair<IndexType>> &col_vec_rhs);
-
-    template<typename LHS_T, typename RHS_T, typename T, typename ... Ts>
-    static StdDataFrame<unsigned int>
-    column_left_right_join_(
-        const LHS_T &lhs,
-        const RHS_T &rhs,
-        const char *col_name,
-        const std::vector<JoinSortingPair<T>> &col_vec_lhs,
-        const std::vector<JoinSortingPair<T>> &col_vec_rhs);
+    // Private methods
+    //
+#   include <DataFrame/Internals/DataFrame_private_decl.h>
 
     // Visiting functors
+    //
 #   include <DataFrame/Internals/DataFrame_functors.h>
 };
 
@@ -3237,6 +3089,8 @@ private:  // Static helper functions
 
 // ----------------------------------------------------------------------------
 
+// All the implementations
+//
 #ifndef HMDF_DO_NOT_INCLUDE_TCC_FILES
 #  include <DataFrame/Internals/DataFrame_standalone.tcc>
 #  include <DataFrame/Internals/DataFrame.tcc>

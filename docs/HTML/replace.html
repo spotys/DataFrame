@@ -35,7 +35,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       <td bgcolor="maroon"> <font color="white">
         <PRE><B>
 template&lt;typename T, size_t N&gt;
-size_type
+std::size_t
 replace(const char *col_name,
         const std::array&lt;T, N&gt; old_values,
         const std::array&lt;T, N&gt; new_values,
@@ -60,8 +60,8 @@ replace(const char *col_name,
     <tr bgcolor="lightgrey">
       <td bgcolor="maroon"> <font color="white">
         <PRE><B>
- emplate&lt;typename T, size_t N&gt;
-std::future&lt;size_type&gt;
+template&lt;typename T, size_t N&gt;
+std::future&lt;std::size_t&gt;
 replace_async(const char *col_name,
               const std::array&lt;T, N&gt; old_values,
               const std::array&lt;T, N&gt; new_values,
@@ -89,9 +89,9 @@ replace(const char *col_name, F &amp;functor);
         This is similar to replace() above but it lets a functor replace the values in the named column. The functor is passed every value of the column along with a const reference of the corresponding index value.<BR>
         Unlike the replace version above, this replace can only work on data columns. It will not work on index column.<BR>
         The functor must have the following interface at minimum:<BR>
-        <PRE>
+        <I><PRE>
     bool operator() (const IndexType &ts, T &value);
-        </PRE>
+        </PRE></I>
         A false return from the above operator method stops the iteration through named column values.
       </td>
       <td>
@@ -125,7 +125,7 @@ replace_async(const char *col_name, F &amp;functor);
       <td bgcolor="maroon"> <font color="white">
         <PRE><B>
 template&lt;size_t N&gt;
-size_type
+std::size_t
 replace_index(const std::array&lt;IndexType, N&gt; old_values,
               const std::array&lt;IndexType, N&gt; new_values,
               int limit = -1);

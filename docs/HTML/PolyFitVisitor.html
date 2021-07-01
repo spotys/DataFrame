@@ -35,11 +35,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       <td bgcolor="maroon"> <font color="white">
         <PRE><B>#include &lt;DataFrame/DataFrameStatsVisitors.h&gt;
 
-template&lt;typename T,
-         typename I = unsigned long,
-         typename =
-             typename std::enable_if&lt;std::is_arithmetic&lt;T&gt;::value, T&gt;::type&gt;
+template&lt;typename T, typename I = unsigned long&gt;
 struct PolyFitVisitor;
+
+// -------------------------------------
+
+template&lt;typename T, typename I = unsigned long&gt;
+using pfit_v = PolyFitVisitor&lt;T, I&gt;;
         </B></PRE></font>
       </td>
       <td>
@@ -48,15 +50,18 @@ struct PolyFitVisitor;
         The result gives you the vector of coefficients.<BR><BR>
         There is also a method <I>get_slope()</I> which returns the first (0-degree) coefficient.<BR>
         There is also a method <I>get_residual()</I> which returns the sum of weighted squared residuals.
+        <I>
         <PRE>
-using weight_func = std::function&lt;T (const I &amp;idx, size_t val_index)&gt;;
+    using weight_func = std::function&lt;T (const I &amp;idx, size_t val_index)&gt;;
 
-explicit
-PolyFitVisitor(size_type degree,
-               weight_func w_func =
-                   [](const I &, size_t) -> T { return (T(1)); });</PRE><BR>
-        <B>degree</B> is the polynomial degree<BR>
-        <B>w_func</B> is a functor that provides weights to be applied to sigma values. w_func is passed two parameters: (1) The value of the index column corresponding to the given y value, (2) The corresponding index into the y vector. The default is no weights.
+    explicit
+    PolyFitVisitor(std::size_t degree,
+                   weight_func w_func =
+                       [](const I &, size_t) -> T { return (T(1)); });
+		</PRE>
+        </I>
+        <B>degree</B>: The polynomial degree<BR>
+        <B>w_func</B>: A functor that provides weights to be applied to sigma values. w_func is passed two parameters: (1) The value of the index column corresponding to the given y value, (2) The corresponding index into the y vector. The default is no weights.
 
       </td>
       <td width="12%">
@@ -69,11 +74,13 @@ PolyFitVisitor(size_type degree,
       <td bgcolor="maroon"> <font color="white">
         <PRE><B>#include &lt;DataFrame/DataFrameStatsVisitors.h&gt;
 
-template&lt;typename T,
-         typename I = unsigned long,
-         typename =
-             typename std::enable_if&lt;std::is_arithmetic&lt;T&gt;::value, T&gt;::type&gt;
+template&lt;typename T, typename I = unsigned long&gt;
 struct LogFitVisitor;
+
+// -------------------------------------
+
+template&lt;typename T, typename I = unsigned long&gt;
+using lfit_v = LogFitVisitor&lt;T, I&gt;;
         </B></PRE></font>
       </td>
       <td>
@@ -82,15 +89,18 @@ struct LogFitVisitor;
         The result gives you the vector of two coefficients.<BR><BR>
         There is also a method <I>get_slope()</I> which returns the first (0-degree) coefficient.<BR>
         There is also a method <I>get_residual()</I> which returns the sum of weighted squared residuals.
+        <I>
         <PRE>
-using weight_func = std::function&lt;T (const I &amp;idx, size_t val_index)&gt;;
+    using weight_func = std::function&lt;T (const I &amp;idx, size_t val_index)&gt;;
 
-explicit
-PolyFitVisitor(size_type degree,
-               weight_func w_func =
-                   [](const I &, size_t) -> T { return (T(1)); });</PRE><BR>
-        <B>degree</B> is the polynomial degree<BR>
-        <B>w_func</B> is a functor that provides weights to be applied to sigma values. w_func is passed two parameters: (1) The value of the index column corresponding to the given y value, (2) The corresponding index into the y vector. The default is no weights.
+    explicit
+    PolyFitVisitor(std::size_t degree,
+                   weight_func w_func =
+                       [](const I &, size_t) -> T { return (T(1)); });
+		</PRE>
+        </I>
+        <B>degree</B>: The polynomial degree<BR>
+        <B>w_func</B>: A functor that provides weights to be applied to sigma values. w_func is passed two parameters: (1) The value of the index column corresponding to the given y value, (2) The corresponding index into the y vector. The default is no weights.
 
       </td>
       <td width="12%">

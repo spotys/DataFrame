@@ -59,13 +59,24 @@ enum class hampel_type : unsigned char  {
 
 template&lt;typename T, typename I = unsigned long&gt;
 struct HampelFilterVisitor;
+
+// -------------------------------------
+
+template&lt;typename T, typename I = unsigned long&gt;
+using hamf_v = HampelFilterVisitor&lt;T, I&gt;;
         </B></PRE></font>
       </td>
       <td>
         This is a “single action visitor”, meaning it is passed the whole data vector in one call and you must use the single_act_visit() interface.<BR><BR>
-        This is a transformer, so it modifies the column data<BR>
+        This is a transformer visitor. It means the column(s) passed to this visitor is not read-only and its values may change<BR><BR>
         This functor class applies Hampel filter to weed out outliers. It replaces the outliers with NaN. The functor result is number of items replaced. The filter is done by using either mean absolute deviation or median absolute deviation<BR><BR>
-        <I>explicit HampelFilterVisitor(size_type widnow_size, hampel_type ht = hampel_type::median, value_type num_of_std = 3)</I>
+        <I><PRE>
+    explicit
+    HampelFilterVisitor(std::size_t widnow_size,
+                        hampel_type ht = hampel_type::median,
+                        T num_of_std = 3);
+        </PRE>
+		</I>
       </td>
       <td width="12%">
         <B>T</B>: Column data type.<BR>

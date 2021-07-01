@@ -41,37 +41,56 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace hmdf
 {
 
-#if defined(WIN32) || defined(_WIN32)
+#if defined(_WIN32) || defined(_WIN64)
 #  ifdef min
 #    undef min
 #  endif // min
 #  ifdef max
 #    undef max
 #  endif // max
-#endif // WIN32 || _WIN32
+#endif // _WIN32 || _WIN64
 
 // ----------------------------------------------------------------------------
 
+// Generic DataFrame error
+//
 struct DataFrameError : public std::runtime_error  {
 
     DataFrameError (const char *desc) : std::runtime_error (desc)  {   }
 };
+
+// Column does not exist error
+//
 struct ColNotFound : public DataFrameError  {
 
     ColNotFound (const char *desc) : DataFrameError (desc)  {   }
 };
+
+// Something in DataFrame/operation is not proper error. For example, trying
+// to load a column with more data than there is in index
+//
 struct InconsistentData : public DataFrameError  {
 
     InconsistentData (const char *desc) : DataFrameError (desc)  {   }
 };
+
+// Bad data range specification error
+//
 struct BadRange : public DataFrameError  {
 
     BadRange (const char *desc) : DataFrameError (desc)  {   }
 };
+
+// The operation is not feasible error. For example, trying to do interpolation
+// on non-arithmetic types
+//
 struct NotFeasible : public DataFrameError  {
 
     NotFeasible (const char *desc) : DataFrameError (desc)  {   }
 };
+
+// The functionality is not implemented error
+//
 struct NotImplemented : public DataFrameError  {
 
     NotImplemented (const char *desc) : DataFrameError (desc)  {   }
@@ -120,16 +139,21 @@ enum class concat_policy : unsigned char  {
 };
 
 // ----------------------------------------------------------------------------
+
 // This policy is relative to a tabular data structure
 //
 enum class shift_policy : unsigned char  {
     // Shift/rotate the content of all columns down, keep index unchanged
+    //
     down = 1,
     // Shift/rotate the content of all columns up, keep index unchanged
+    //
     up = 2,
     // Shift/rotate the columns to the left
+    //
     left = 3,
     // Shift/rotate the columns to the right
+    //
     right = 4,
 };
 
@@ -138,21 +162,26 @@ enum class shift_policy : unsigned char  {
 enum class fill_policy : unsigned char  {
 
     // Fill all missing values with the given substitute
+    //
     value = 1,
 
     // Fill the missing values with the previous value
+    //
     fill_forward = 2,
 
     // Fill the missing values with the next value
+    //
     fill_backward = 3,
 
     //           X - X1
     // Y = Y1 + --------- * (Y2 - Y1)
     //           X2 - X1
+    //
     linear_interpolate = 4,  // Using the index as X coordinate
     linear_extrapolate = 5,  // Using the index as X coordinate
 
     // Fill missing values with mid-point of surrounding values
+    //
     mid_point = 6,
 };
 
@@ -171,6 +200,17 @@ enum class drop_policy : unsigned char  {
     all = 1,       // Remove row if all columns are nan
     any = 2,       // Remove row if any column is nan
     threshold = 3, // Remove row if threshold number of columns are nan
+};
+
+// ----------------------------------------------------------------------------
+
+enum class mean_type : unsigned char  {
+
+    arithmetic = 1, // sum(value) / count
+    weighted = 2,   // sum(weighted value) / ((count * (count + 1)) / 2)
+    geometric = 3,  // exp(log(sum(value)) / count)
+    harmonic = 4,   // count / sum(1 / value)
+    quadratic = 5,  // sqrt(sum(value * value) / count)
 };
 
 // ----------------------------------------------------------------------------
@@ -314,6 +354,7 @@ enum class sigmoid_type : unsigned char  {
 // has been used, this is equivalent to using a multiplicative decomposition
 // because:
 //    Y[t] = T * S * R is equivalent to log(Y[t]) = log(T) + logt(S) + log(R)
+//
 enum class decompose_type : unsigned char  {
     additive = 1,        // Y(t) = Trend + Seasonal + Residual
     multiplicative = 2,  // Y(t) = Trend * Seasonal * Residual
@@ -324,16 +365,31 @@ enum class decompose_type : unsigned char  {
 enum class box_cox_type : unsigned char  {
     // y(λ) = (y^λ - 1) / λ,  if λ != 0
     // y(λ) = log(y),         if λ == 0
+    //
     original = 1,
     // y(λ) = (y^λ - 1) / (λ * GM^(λ - 1)),  if λ != 0
     // y(λ) = GM * log(y),                   if λ == 0
+    //
     geometric_mean = 2,
     // y(λ) = sign(y) * (((|y| + 1)^λ - 1) / λ),  if λ != 0
     // y(λ) = sign(y) * log(|y| + 1),             if λ == 0
+    //
     modulus = 3,
     // y(λ) = (e^λy - 1) / λ,  if λ != 0
     // y(λ) = y,               if λ == 0
+    //
     exponential = 4,
+};
+
+// ----------------------------------------------------------------------------
+
+enum class bucket_type : unsigned char  {
+    // Bucketize by distance between two index values (i.g. X2 - X1 = N)
+    //
+    by_distance = 1,
+    // Bucketize by counting of index values (e.g. every N index items)
+    //
+    by_count = 2,
 };
 
 // ----------------------------------------------------------------------------
@@ -346,26 +402,37 @@ struct  RandGenParams  {
     unsigned int    seed { static_cast<unsigned int>(-1) };
 
     // The p distribution parameter (probability of generating true)
+    //
     double      prob_true { 0.5 };
     // The t or k distribution parameter (number of trials)
+    //
     std::size_t t_dist { 1 };
     // The μ distribution parameter (the mean of the distribution)
+    //
     double      mean { 1.0 };
     // the σ distribution parameter (standard deviation)
+    //
     double      std { 0 };
     // The λ distribution parameter (the rate parameter)
+    //
     double      lambda { 1.0 };
     // The α distribution parameter (shape, location)
+    //
     double      alpha { 1.0 };
     // The β distribution parameter (scale)
+    //
     double      beta { 1.0 };
     // The m distribution parameter (log-scale)
+    //
     double      m { 0 };
     // The s distribution parameter (shape)
+    //
     double      s { 1.0 };
     // The n distribution parameter (degrees of freedom)
+    //
     double      n { 1.0 };
     // degrees of freedom for fisher_f_distribution
+    //
     double      n2 { 1.0 };
 };
 

@@ -34,25 +34,29 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       <td bgcolor="maroon"> <font color="white">
         <PRE><B>#include &lt;DataFrame/DataFrameFinancialVisitors.h&gt;
 
-template&lt;typename T,
-         typename I = unsigned long,
-         typename =
-             typename std::enable_if&lt;std::is_arithmetic&lt;T&gt;::value, T&gt;::type&gt;
+template&lt;typename T, typename I = unsigned long&gt;
 struct DoubleCrossOver;
+
+// -------------------------------------
+
+template&lt;typename T, typename I = unsigned long&gt;
+using dco_v = DoubleCrossOver&lt;T, I&gt;;
         </B></PRE></font>
       </td>
       <td>
         This is a “single action visitor”, meaning it is passed the whole data vector in one call and you must use the single_act_visit() interface.<BR><BR>
         This functor class calculates the crossover of a data vector with two of its moving averages. It could be used to generate signals within financial applications.<BR>
         The constructor takes the two adopters:<BR>
+        <I>
         <PRE>
     DoubleCrossOver(S_RT &&short_moving, L_RT &&long_moving)
         </PRE>
+        </I>
         There are 3 methods that give you the results:<BR>
         <OL>
-          <LI>const result_type &get_raw_to_short_term() const – Returns a vector of data column minus short moving average</LI>
-          <LI>const result_type &get_raw_to_long_term() const – Returns a vector of data column minus long moving average</LI>
-          <LI>const result_type &get_short_term_to_long_term () const – Returns a vector of short term moving average minus long moving average</LI>
+          <LI><I>const result_type &get_raw_to_short_term() const</I> – Returns a vector of data column minus short moving average</LI>
+          <LI><I>const result_type &get_raw_to_long_term() const</I> – Returns a vector of data column minus long moving average</LI>
+          <LI><I>const result_type &get_short_term_to_long_term () const</I> – Returns a vector of short term moving average minus long moving average</LI>
         </OL>
       </td>
       <td>

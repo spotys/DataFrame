@@ -30,15 +30,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <DataFrame/Utils/DateTime.h>
 #include <DataFrame/Utils/FixedSizeString.h>
 
-#ifdef _WIN32
-#  if defined(_MSC_VER) || defined(_MSC_EXTENSIONS)
+#ifdef _MSC_VER
+#  ifdef _MSC_EXTENSIONS
 #    define DELTA_EPOCH_IN_MICROSECS  11644473600000000Ui64
 #  else
 #    define DELTA_EPOCH_IN_MICROSECS  11644473600000000ULL
-#  endif // defined(_MSC_VER) || defined(_MSC_EXTENSIONS)
+#  endif // _MSC_EXTENSIONS
 #else
 #  include <sys/time.h>
-#endif // _WIN32
+#endif // _MSC_VER
 
 // ----------------------------------------------------------------------------
 
@@ -47,7 +47,7 @@ namespace hmdf
 
 DateTime::DateTime (DT_TIME_ZONE tz) : time_zone_(tz)  {
 
-#ifdef _WIN32
+#ifdef _MSC_VER
     FILETIME            ft;
     unsigned __int64    tmpres = 0;
 
@@ -58,7 +58,9 @@ DateTime::DateTime (DT_TIME_ZONE tz) : time_zone_(tz)  {
     tmpres |= ft.dwLowDateTime;
 
     tmpres /= 10;  // convert into microseconds
+
     // converting file time to unix epoch
+    //
     tmpres -= DELTA_EPOCH_IN_MICROSECS;
 
     set_time(tmpres / 1000000UL, (tmpres % 1000000UL) * 1000000);
@@ -72,7 +74,7 @@ DateTime::DateTime (DT_TIME_ZONE tz) : time_zone_(tz)  {
 
     ::gettimeofday(&tv, nullptr);
     set_time(tv.tv_sec, tv.tv_usec * 1000);
-#endif // _WIN32
+#endif // _MSC_VER
 }
 
 // ----------------------------------------------------------------------------
@@ -123,6 +125,13 @@ DateTime::DateTime (DateType d,
 //  (4)  YYYY/MM/DD HH:MM:SS
 //  (5)  YYYY/MM/DD HH:MM:SS.MMM
 //
+// ISO_STYLE:
+//  (12) YYYY-MM-DD
+//  (13) YYYY-MM-DD HH
+//  (14) YYYY-MM-DD HH:MM
+//  (15) YYYY-MM-DD HH:MM:SS
+//  (16) YYYY-MM-DD HH:MM:SS.MMM
+//
 DateTime::DateTime (const char *s, DT_DATE_STYLE ds, DT_TIME_ZONE tz)
     : time_zone_ (tz)  {
 
@@ -138,7 +147,7 @@ DateTime::DateTime (const char *s, DT_DATE_STYLE ds, DT_TIME_ZONE tz)
 
         hour_ = minute_ = second_ = nanosecond_ = 0;
         if (ds == DT_DATE_STYLE::AME_STYLE)  {
-            if (str_len == 10)  {
+            if (str_len <= 10)  {
                 ::sscanf (str, "%d/%d/%d", &month, &day, &year);
             }
             else if (str_len == 13)  {
@@ -161,7 +170,7 @@ DateTime::DateTime (const char *s, DT_DATE_STYLE ds, DT_TIME_ZONE tz)
             }
         }
         else if (ds == DT_DATE_STYLE::EUR_STYLE)  {
-            if (str_len == 10)  {
+            if (str_len <= 10)  {
                 ::sscanf (str, "%d/%d/%d", &year, &month, &day);
             }
             else if (str_len == 13)  {
@@ -181,6 +190,38 @@ DateTime::DateTime (const char *s, DT_DATE_STYLE ds, DT_TIME_ZONE tz)
                 ::sscanf (str, "%d/%d/%d %hd:%hd:%hd.%hd",
                           &year, &month, &day, &hour_, &minute_, &second_, &ms);
                 nanosecond_ = ms * 1000000;
+            }
+        }
+        else if (ds == DT_DATE_STYLE::ISO_STYLE)  {
+            if (str_len <= 10)  {
+                ::sscanf (str, "%d-%d-%d", &year, &month, &day);
+            }
+            else if (str_len == 13)  {
+                ::sscanf (str, "%d-%d-%d %hd", &year, &month, &day, &hour_);
+            }
+            else if (str_len == 16)  {
+                ::sscanf (str, "%d-%d-%d %hd:%hd",
+                          &year, &month, &day, &hour_, &minute_);
+            }
+            else if (str_len == 19)  {
+                ::sscanf (str, "%d-%d-%d %hd:%hd:%hd",
+                          &year, &month, &day, &hour_, &minute_, &second_);
+            }
+            else if (str_len == 23)  {
+                MillisecondType millis { 0 };
+
+                ::sscanf (str, "%d-%d-%d %hd:%hd:%hd.%hd",
+                          &year, &month, &day, &hour_, &minute_,
+                          &second_, &millis);
+                nanosecond_ = millis * 1000000;
+            }
+            else if (str_len > 23)  {
+                MicrosecondType micros { 0 };
+
+                ::sscanf (str, "%d-%d-%d %hd:%hd:%hd.%d",
+                          &year, &month, &day, &hour_, &minute_,
+                          &second_, &micros);
+                nanosecond_ = micros * 1000;
             }
         }
         if (year == 0 && month == 0 && day == 0)  {
@@ -444,6 +485,10 @@ void DateTime::set_timezone (DT_TIME_ZONE tz)  {
     breaktime_ (t, nanosec ());
     return;
 }
+
+// ----------------------------------------------------------------------------
+
+DT_TIME_ZONE DateTime::get_timezone () const  { return (time_zone_); }
 
 // ----------------------------------------------------------------------------
 
@@ -857,14 +902,14 @@ std::string DateTime::string_format (DT_FORMAT format) const  {
 inline void DateTime::change_env_timezone_(DT_TIME_ZONE time_zone)  {
 
     if (time_zone != DT_TIME_ZONE::LOCAL)  {
-#ifdef _WIN32
+#ifdef _MSC_VER
         // SetEnvironmentVariable (L"TZ", TIMEZONES_ [time_zone]);
         _putenv (TIMEZONES_[static_cast<int>(time_zone)]);
         _tzset ();
 #else
         ::setenv ("TZ", TIMEZONES_[static_cast<int>(time_zone)], 1);
         ::tzset ();
-#endif // _WIN32
+#endif // _MSC_VER
     }
 }
 
@@ -873,14 +918,14 @@ inline void DateTime::change_env_timezone_(DT_TIME_ZONE time_zone)  {
 inline void DateTime::reset_env_timezone_(DT_TIME_ZONE time_zone)  {
 
     if (time_zone != DT_TIME_ZONE::LOCAL)  {
-#ifdef _WIN32
+#ifdef _MSC_VER
         // SetEnvironmentVariable (L"TZ", nullptr);
         _putenv ("TZ=");
         _tzset ();
 #else
         ::unsetenv ("TZ");
         ::tzset ();
-#endif // _WIN32
+#endif // _MSC_VER
     }
 }
 
@@ -913,11 +958,11 @@ DateTime::breaktime_ (EpochType the_time, NanosecondType nanosec) noexcept  {
 
     struct tm   ltime;
 
-#ifdef _WIN32
+#ifdef _MSC_VER
     localtime_s (&ltime, &the_time);
 #else
     localtime_r (&the_time, &ltime);
-#endif // _WIN32
+#endif // _MSC_VER
 
     reset_env_timezone_(time_zone_);
 
@@ -998,6 +1043,26 @@ void DateTime::date_to_str (DT_FORMAT format, T &result) const  {
                            static_cast<int>(minute ()),
                            static_cast<int>(sec ()),
                            static_cast<int>(msec ()));
+        } break;
+
+        case DT_FORMAT::ISO_DT_TM:
+        {
+            buffer.printf ("%d-%002d-%002d %002d:%002d:%002d.%0000006d",
+                           static_cast<int>(year ()),
+                           static_cast<int>(month ()),
+                           static_cast<int>(dmonth ()),
+                           static_cast<int>(hour ()),
+                           static_cast<int>(minute ()),
+                           static_cast<int>(sec ()),
+                           static_cast<int>(microsec ()));
+        } break;
+
+        case DT_FORMAT::ISO_DT:
+        {
+            buffer.printf ("%d-%002d-%002d",
+                           static_cast<int>(year ()),
+                           static_cast<int>(month ()),
+                           static_cast<int>(dmonth ()));
         } break;
 
         case DT_FORMAT::DT_DATETIME:

@@ -110,6 +110,14 @@ void DataFrame<I, H>::remove_column (const char *name)  {
 // ----------------------------------------------------------------------------
 
 template<typename I, typename  H>
+void DataFrame<I, H>::remove_column(size_type index)  {
+
+    return (remove_column(column_list_[index].first.c_str()));
+}
+
+// ----------------------------------------------------------------------------
+
+template<typename I, typename  H>
 void DataFrame<I, H>::rename_column (const char *from, const char *to)  {
 
     static_assert(std::is_base_of<HeteroVector, DataVec>::value,
@@ -182,13 +190,14 @@ DataFrame<I, H>::load_data (IndexVecType &&indices, Ts&& ... args)  {
     static_assert(std::is_base_of<HeteroVector, DataVec>::value,
                   "Only a StdDataFrame can call load_data()");
 
-    size_type       cnt = load_index(std::move(indices));
-    auto            args_tuple = std::tuple<Ts ...>(args ...);
+    size_type   cnt = load_index(std::forward<IndexVecType>(indices));
+    auto        args_tuple =
+        std::move(std::tuple<Ts ...>(std::forward<Ts>(args) ...));
     // const size_type tuple_size =
     //     std::tuple_size<decltype(args_tuple)>::value;
-    auto            fc =
+    auto        fc =
         [this, &cnt](auto &pa) mutable -> void {
-            cnt += this->_load_pair(pa);
+            cnt += this->load_pair_(pa);
         };
 
     for_each_in_tuple (args_tuple, fc);
@@ -346,11 +355,11 @@ load_column (const char *name,
         char buffer [512];
 
         sprintf (buffer, "DataFrame::load_column(): ERROR: "
-#ifdef _WIN32
+#ifdef _MSC_VER
                          "data size of %zu is larger than index size of %zu",
 #else
                          "data size of %lu is larger than index size of %lu",
-#endif // _WIN32
+#endif // _MSC_VER
                  s, idx_s);
         throw InconsistentData (buffer);
     }
@@ -411,20 +420,20 @@ template<typename I, typename  H>
 template<typename T>
 typename DataFrame<I, H>::size_type
 DataFrame<I, H>::
-load_column (const char *name, std::vector<T> &&data, nan_policy padding)  {
+load_column (const char *name, std::vector<T> &&column, nan_policy padding)  {
 
     const size_type idx_s = indices_.size();
-    const size_type data_s = data.size();
+    const size_type data_s = column.size();
 
     if (data_s > idx_s)  {
         char buffer [512];
 
         sprintf (buffer, "DataFrame::load_column(): ERROR: "
-#ifdef _WIN32
+#ifdef _MSC_VER
                          "data size of %zu is larger than index size of %zu",
 #else
                          "data size of %lu is larger than index size of %lu",
-#endif // _WIN32
+#endif // _MSC_VER
                  data_s, idx_s);
         throw InconsistentData (buffer);
     }
@@ -433,7 +442,7 @@ load_column (const char *name, std::vector<T> &&data, nan_policy padding)  {
 
     if (padding == nan_policy::pad_with_nans && data_s < idx_s)  {
         for (size_type i = 0; i < idx_s - data_s; ++i)  {
-            data.push_back (std::move(get_nan<T>()));
+            column.push_back (std::move(get_nan<T>()));
             ret_cnt += 1;
         }
     }
@@ -450,7 +459,7 @@ load_column (const char *name, std::vector<T> &&data, nan_policy padding)  {
         vec_ptr = &(hv.template get_vector<T>());
     }
 
-    *vec_ptr = std::move(data);
+    *vec_ptr = std::move(column);
     return (ret_cnt);
 }
 
@@ -462,7 +471,7 @@ typename DataFrame<I, H>::size_type
 DataFrame<I, H>::
 load_align_column(
     const char *name,
-    std::vector<T> &&data,
+    std::vector<T> &&column,
     size_type interval,
     bool start_from_beginning,
     const T &null_value,
@@ -471,17 +480,17 @@ load_align_column(
                         const DataFrame::IndexType &)> diff_func)  {
 
     const size_type idx_s = indices_.size();
-    const size_type data_s = data.size();
+    const size_type data_s = column.size();
 
     if (data_s > idx_s || data_s == 0)  {
         char buffer [512];
 
         sprintf (buffer, "DataFrame::load_align_column(): ERROR: "
-#ifdef _WIN32
+#ifdef _MSC_VER
                          "data size of %zu is larger than index size of %zu",
 #else
                          "data size of %lu is larger than index size of %lu",
-#endif // _WIN32
+#endif // _MSC_VER
                  data_s, idx_s);
         throw InconsistentData (buffer);
     }
@@ -490,7 +499,7 @@ load_align_column(
     size_type       idx_idx { 0 };
 
     if (start_from_beginning)  {
-        new_col[0] = std::move(data[0]);
+        new_col[0] = std::move(column[0]);
         idx_idx = 1;
     }
 
@@ -503,7 +512,7 @@ load_align_column(
 
         if (idx_diff < interval)  continue;
         new_col[idx_idx + (idx_diff > interval ? -1 : 0)] =
-            std::move(data[data_idx]);
+            std::move(column[data_idx]);
         idx_ref_idx = idx_idx + (idx_diff > interval ? -1 : 0);
         data_idx += 1;
     }
@@ -529,11 +538,11 @@ load_column (const char *name,
 template<typename I, typename  H>
 template<typename T1, typename T2>
 typename DataFrame<I, H>::size_type
-DataFrame<I, H>::_load_pair(std::pair<T1, T2> &col_name_data)  {
+DataFrame<I, H>::load_pair_(std::pair<T1, T2> &col_name_data)  {
 
     return (load_column<typename decltype(col_name_data.second)::value_type>(
                 col_name_data.first, // column name
-                std::move(col_name_data.second),
+                std::forward<T2>(col_name_data.second),
                 nan_policy::pad_with_nans));
 }
 
@@ -555,11 +564,11 @@ append_column (const char *name,
         char buffer [512];
 
         sprintf (buffer, "DataFrame::append_column(): ERROR: "
-#ifdef _WIN32
+#ifdef _MSC_VER
                          "data size of %zu is larger than index size of %zu",
 #else
                          "data size of %lu is larger than index size of %lu",
-#endif // _WIN32
+#endif // _MSC_VER
                  s, idx_s);
         throw InconsistentData (buffer);
     }
@@ -595,11 +604,11 @@ append_column (const char *name, const T &val, nan_policy padding)  {
         char buffer [512];
 
         sprintf (buffer, "DataFrame::append_column(): ERROR: "
-#ifdef _WIN32
+#ifdef _MSC_VER
                          "data size of %zu is larger than index size of %zu",
 #else
                          "data size of %lu is larger than index size of %lu",
-#endif // _WIN32
+#endif // _MSC_VER
                  s, idx_s);
         throw InconsistentData (buffer);
     }
